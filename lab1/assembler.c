@@ -7,9 +7,17 @@
 #define MAX_LABEL_LEN 20
 #define MAX_SYMBOLS 255
 #define MAX_LINE_LENGTH 255
-#define OPCODE_SIZE 21
+#define OPCODE_SIZE 28
 
-const char *opcode[] = {"add", "and", "br", "halt", "jmp", "jsr", "jsrr", "ldb", "ldw", "lea", "nop", "not", "ret", "lshf", "rshfl", "rshfa", "rti", "stb", "stw", "trap", "xor"};
+#define IMM5_MAX 15
+#define IMM5_MIN -16
+
+#define OFFSET6_MAX 31
+#define OFFSET6_MIN -32
+
+
+
+const char *opcode[] = {"add", "and", "br", "brn", "brz", "brp", "brnp", "brnz", "brzp", "brnzp", "halt", "jmp", "jsr", "jsrr", "ldb", "ldw", "lea", "nop", "not", "ret", "rti", "lshf", "rshfl", "rshfa", "stb", "stw", "trap", "xor"};
 
 /*
  * brn, brp, brnp, br, brz, brnz, brzp, brnzp; How to handle with it?
@@ -24,17 +32,64 @@ typedef struct {
   char label[MAX_LABEL_LEN + 1];
 } TableEntry;
 TableEntry symbolTable[MAX_SYMBOLS];
+int symbolTableSize;
+
+typedef struct{
+  char opcode[5];
+  int encoding;
+}OpcodeEncodingMap;
+
+OpcodeEncodingMap opcodeEncodingMap[OPCODE_SIZE] = {
+  {"add",   0b0001},
+  {"and",   0b0101},
+  {"br",    0b0000},
+  {"brn",   0b0000},
+  {"brp",   0b0000},
+  {"brz",   0b0000},
+  {"brnp",  0b0000},
+  {"brnz",  0b0000},
+  {"brzp",  0b0000},
+  {"brnzp", 0b0000},
+  {"halt",  0b1111},
+  {"jmp",   0b1100},
+  {"jsr",   0b0100},
+  {"jsrr",  0b0100},
+  {"ldb",   0b0010},
+  {"ldw",   0b0110},
+  {"lea",   0b1110},
+  {"nop",   0b0000},
+  {"not",   0b1001},
+  {"ret",   0b1100},
+  {"rti",   0b1000},
+  {"lshf",  0b1101},
+  {"rshfl", 0b1101},
+  {"rshfa", 0b1101},
+  {"stb",   0b0011},
+  {"stw",   0b0111},
+  {"trap",  0b1111},
+  {"xor",   0b1001},
+};
+
+int encodeOpcode(char *opcode) {
+  int i;
+  for (i = 0; i < OPCODE_SIZE; ++i) {
+	if (!strcmp(opcodeEncodingMap[i].opcode, opcode)) {
+	  return opcodeEncodingMap[i].encoding;
+	}
+  }
+  printf("error");
+  return -1;
+  //error....
+}
 
 FILE* infile = NULL;
 FILE* outfile = NULL;
-
-
 
 int isOpcode(char *ptr) {
   int i;
   for (i = 0; i < OPCODE_SIZE; ++i) {
 	if (strcmp(ptr, opcode[i]) == 0) {
-	  return 1;
+	  return 0;
 	}
   }
   return -1;
@@ -80,10 +135,8 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
 	  exit(4);
 	}
 	*/
-
 	return (DONE);
   }
-
 
   while (1) {
     if (!(lPtr = strtok(NULL, "\t\n ,"))) {return (OK);}
@@ -110,7 +163,7 @@ void firstPass(char *iFileName) {
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
-      printf("line %d: %s\n", lineNo, lLine);
+      printf("line %d: %s\n", lineN, lLine);
 	  if (lineNo == 0) {
 		/*
 		if (*lLabel != '\0') {
@@ -159,33 +212,33 @@ int isReg(char *ptr) {
   if (strlen(ptr) != 2) {
 	return 0;
   }
-  if (ptr[0] == 'R' && isdigit(ptr[1])) {	
+  if (ptr[0] == 'r' && isdigit(ptr[1])) {	
 	regID = atoi(ptr+1);
 	if (regID >= 0 && regID <= 8) {
 	  return 1;
 	} else {
+	  /*error msg is shown by toNum....*/
 	  return 0;
 	}
   } else {
+	  /*error msg is shown by toNum....*/
 	return 0;
   }
 }
 
 
-int extractRegID(char *ptr) {
+int extractRegID(char *ptr, int lineNo) {
   int regID;
   printf("reg:%s\n", ptr);
   if (strlen(ptr) != 2) {
-	//error...
+	errorMsg(1, lineNo);
   }
   if (ptr[0] == 'r' && isdigit(ptr[1])) {	
 	regID = atoi(ptr+1);
-	if (regID >= 0 && regID <= 8) {
-	  printf("coming inside regid\n");
-
+	if (regID >= 0 && regID <= 7) {
 	  return regID;
 	} else {
-	  //error;
+	  errorMsg(1, lineNo);
 	}
   } else {
 	//error....
@@ -198,12 +251,99 @@ int isImm(char *ptr) {
 }
 */
 
+void errorMsg(int errorNo, int lineNo) {
+  switch (errorNo):
+  case 0:
+      printf("Error: wrong number of operands: %d", lineNo);
+      exit(4);
+	  break;
+  case 1:
+      printf("Error: Invalid oprand: %d", lineNo);
+      exit(4);
+	  break;
+  case 2:
+      printf("Error: Invalid constant: %d", lineNo);
+      exit(3);
+	  break;
+  case 3:
+ 
+
+
+  default:
+      printf("Error: wrong number of operands: %d", lineNo);
+      exit(4);
+}
+
+
+void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfile, int lineNo) {
+  int number;
+  int lInstr = 0;
+
+  lInstr |= (encodeOpcode(pOpcode) << 12); /*encode opcode*/
+  if (!strcmp(pOpcode, "add") || !strcmp(pOpcode, "and") || !strcmp(pOpcode, "xor")) {
+    /*check the number of operands is 3*/
+    if (pArgc != 3) {
+	  errorMsg(0, lineNo);
+    }
+    lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
+    lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
+    if (isReg(pArg[2])) { /*encode SR2 or imm5*/
+      lInstr |= 0 << 5;
+      lInstr |= 00 << 3;
+      lInstr |= (extractRegID(pArg[2]));
+    } else {
+      lInstr |= 1 << 5;
+      //we need to check whether lArg2 has exceeded the largest possible number???
+      number = toNum(pArg[2]);
+      //Do we need to check this??????????????????
+      if (number > IMM5_MAX || number < IMM5_MIN) {
+		errorMsg(2, lineNo);
+      }
+      lInstr |= (number & 0b11111);
+    }
+  } else if (strcmp(pOpcode, "br") == 0) {
+  
+  } else if (!strcmp(pOpcode, "ldb") || !strcmp(pOpcode, "ldw") || !strcmp(pOpcode, "stb") || !strcmp(pOpcode, "stw")) {
+    /*check the number of operands is 3*/
+    if (pArgc != 3) {
+	  errorMsg(0, lineNo);
+    }
+    lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
+    lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
+	number = toNum(pArg[2]);
+	if (number > OFFSET6_MAX || number < OFFSET6_MIN) {
+	  errorMsg(2, lineNo);
+	}
+	lInstr |= (number & 0b111111);
+  } else if (!strcmp(pOpcode, "lshf") || !strcmp(pOpcode, "rshfl") || !strcmp(pOpcode, "rshfa")) {
+    if (pArgc != 3) {
+	  errorMsg(0, lineNo);
+    }
+    lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
+    lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
+
+	if(!strcmp(pOpcode, "lshf")) {
+	}
+
+	number = toNum(pArg[2]);
+	
+ 
+
+  }
+
+ 
+ 
+  
+  }
+  
+  fprintf(lOutfile, "0x%.4X\n", lInstr);
+
+}
 
 void secondPass(char *iFileName, char *oFileName) {
   char lLine[MAX_LINE_LENGTH+1], *lLabel, *lOpcode, *lArg[4];
   int lRet, lArgc;
   int startAddr;
-  int lInstr = 0;
 
   FILE *lInfile, *lOutfile;
   int symbolTableIndex = 0;
@@ -215,41 +355,10 @@ void secondPass(char *iFileName, char *oFileName) {
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
-	  lInstr = 0;
       printf("line %d: %s\n", lineNo, lLine);
 
-	  if (strcmp(lOpcode, "add") == 0) {
-		//check the number of operands is 3..
-		if (lArgc != 3) {
-		  printf("Error: wrong number of operands");
-		  exit(4);
-		}
-		lInstr |= (0001 << 12); /*encode opcode*/
-		lInstr |= (extractRegID(lArg[0]) << 9); /*encode DR*/
-		lInstr |= (extractRegID(lArg[1]) << 6); /*encode SR1*/
-		if (isReg(lArg[2])) { /*encode SR2 or imm5*/
-		  lInstr |= 0 << 5;
-		  lInstr |= 00 << 3;
-		  lInstr |= (extractRegID(lArg[2]));
-		} else {
-	      lInstr |= 1 << 5;
-		  //we need to check whether lArg2 has exceeded the largest possible number???
-		  temp = toNum(lArg[2]);
-		  if (temp > 15 || temp < -16) {
-			printf("Error: Out of range\n");
-			exit(4);
-		  }
-		  lInstr |= (temp & 0b11111 );
-		}
-	  } else if (strcmp(lOpcode, "and") == 0) {
+	  genHexCode(lLabel, lOpcode, lArgc, lArg, lOutfile, lineNo);
 
-	  } else if (strcmp(lOpcode, "br") == 0) {
-
-	  } else if (strcmp(lOpcode, "") == 0) {
-
-	  }
-
-	  fprintf(lOutfile, "0x%.4X\n", lInstr);
 	}
 	lineNo++;
 
@@ -265,7 +374,6 @@ void secondPass(char *iFileName, char *oFileName) {
   */
 
   fclose(lInfile);
-
 }
 
 
