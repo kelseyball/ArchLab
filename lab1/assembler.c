@@ -15,6 +15,21 @@
 #define OFFSET6_MAX 31
 #define OFFSET6_MIN -32
 
+#define AMOUNT4_MAX 15
+#define AMOUNT4_MIN 0
+
+#define TRAPVEC8_MAX 255
+#define TRAPVEC8_MIN 0
+
+#define FILL_MAX 65535
+//#define FILL_MIN -65536
+#define FILL_MIN -32768
+
+#define PC9_MAX 255
+#define PC9_MIN -256
+
+#define PC11_MAX 1023
+#define PC11_MIN -1024
 
 
 const char *opcode[] = {"add", "and", "br", "brn", "brz", "brp", "brnp", "brnz", "brzp", "brnzp", "halt", "jmp", "jsr", "jsrr", "ldb", "ldw", "lea", "nop", "not", "ret", "rti", "lshf", "rshfl", "rshfa", "stb", "stw", "trap", "xor"};
@@ -33,6 +48,45 @@ typedef struct {
 } TableEntry;
 TableEntry symbolTable[MAX_SYMBOLS];
 int symbolTableSize;
+
+void errorMsg(int errorNo, int lineNo) {
+  switch (errorNo) {
+  case 0:
+      printf("Error: wrong number of operands: %d", lineNo);
+      exit(4);
+	  break;
+  case 1:
+      printf("Error: Invalid operand: %d", lineNo);
+      exit(4);
+	  break;
+  case 2:
+      printf("Error: Invalid constant: %d", lineNo);
+      exit(3);
+	  break;
+  case 3:
+      printf("Error: Undefined label: %d", lineNo);
+      exit(1);
+	  break;
+  case 4:
+      printf("Error: Invalid opcode: %d", lineNo);
+      exit(2);
+	  break;
+  default:
+      printf("Error: wrong number of operands: %d", lineNo);
+      exit(4);
+  }
+}
+
+
+int extractAddr(char *label, int lineNo) {
+  int i;
+  for (i = 0; i < symbolTableSize; ++i) {
+	if (!strcmp(symbolTable[i].label, label)) {
+	  return symbolTable[i].address;
+	}
+  }
+  errorMsg(3, lineNo);
+}
 
 typedef struct{
   char opcode[5];
@@ -85,13 +139,14 @@ int encodeOpcode(char *opcode) {
 FILE* infile = NULL;
 FILE* outfile = NULL;
 
-int isOpcode(char *ptr) {
+int isOpcode(char *ptr, int lineNo) {
   int i;
   for (i = 0; i < OPCODE_SIZE; ++i) {
 	if (strcmp(ptr, opcode[i]) == 0) {
 	  return 0;
 	}
   }
+  errorMsg(4, lineNo);
   return -1;
 }
 
@@ -191,7 +246,8 @@ void firstPass(char *iFileName) {
 
 	  if (*lLabel != '\0') {
 		//printf("come inside the label branch\n");
-		symbolTable[symbolTableIndex].address = startAddr + lineNo * 2;
+		//symbolTable[symbolTableIndex].address = startAddr + lineNo * 2;
+		symbolTable[symbolTableIndex].address = lineNo;
 		strcpy(symbolTable[symbolTableIndex].label, lLabel);
 		symbolTableIndex++;
 	  }
@@ -251,90 +307,126 @@ int isImm(char *ptr) {
 }
 */
 
-void errorMsg(int errorNo, int lineNo) {
-  switch (errorNo):
-  case 0:
-      printf("Error: wrong number of operands: %d", lineNo);
-      exit(4);
-	  break;
-  case 1:
-      printf("Error: Invalid oprand: %d", lineNo);
-      exit(4);
-	  break;
-  case 2:
-      printf("Error: Invalid constant: %d", lineNo);
-      exit(3);
-	  break;
-  case 3:
- 
-
-
-  default:
-      printf("Error: wrong number of operands: %d", lineNo);
-      exit(4);
-}
-
-
 void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfile, int lineNo) {
-  int number;
+  int number, address;
   int lInstr = 0;
 
-  lInstr |= (encodeOpcode(pOpcode) << 12); /*encode opcode*/
+  if (pOpcode[0] != '.') lInstr |= (encodeOpcode(pOpcode) << 12); /*encode opcode*/
   if (!strcmp(pOpcode, "add") || !strcmp(pOpcode, "and") || !strcmp(pOpcode, "xor")) {
-    /*check the number of operands is 3*/
-    if (pArgc != 3) {
-	  errorMsg(0, lineNo);
-    }
+    if (pArgc != 3) errorMsg(0, lineNo); /* check the number of operands is 3 */
     lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
     lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
     if (isReg(pArg[2])) { /*encode SR2 or imm5*/
-      lInstr |= 0 << 5;
-      lInstr |= 00 << 3;
-      lInstr |= (extractRegID(pArg[2]));
+      lInstr |= 0b0 << 5;
+      lInstr |= 0b00 << 3;
+      lInstr |= (extractRegID(pArg[2], lineNo));
     } else {
-      lInstr |= 1 << 5;
-      //we need to check whether lArg2 has exceeded the largest possible number???
+      lInstr |= 0b1 << 5;
       number = toNum(pArg[2]);
-      //Do we need to check this??????????????????
       if (number > IMM5_MAX || number < IMM5_MIN) {
 		errorMsg(2, lineNo);
       }
       lInstr |= (number & 0b11111);
     }
-  } else if (strcmp(pOpcode, "br") == 0) {
-  
   } else if (!strcmp(pOpcode, "ldb") || !strcmp(pOpcode, "ldw") || !strcmp(pOpcode, "stb") || !strcmp(pOpcode, "stw")) {
-    /*check the number of operands is 3*/
-    if (pArgc != 3) {
-	  errorMsg(0, lineNo);
-    }
+    if (pArgc != 3) errorMsg(0, lineNo); /* check the number of operands is 3 */
     lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
     lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
 	number = toNum(pArg[2]);
-	if (number > OFFSET6_MAX || number < OFFSET6_MIN) {
-	  errorMsg(2, lineNo);
-	}
+	if (number > OFFSET6_MAX || number < OFFSET6_MIN) errorMsg(2, lineNo);
 	lInstr |= (number & 0b111111);
   } else if (!strcmp(pOpcode, "lshf") || !strcmp(pOpcode, "rshfl") || !strcmp(pOpcode, "rshfa")) {
-    if (pArgc != 3) {
-	  errorMsg(0, lineNo);
-    }
+    if (pArgc != 3) errorMsg(0, lineNo); /* check the number of operands is 3 */
     lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
     lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
-
-	if(!strcmp(pOpcode, "lshf")) {
-	}
-
+	if(!strcmp(pOpcode, "lshf")) lInstr |= (0b00 << 4);
+	else if(!strcmp(pOpcode, "rshfl")) lInstr |= (0b01 << 4);
+	else if(!strcmp(pOpcode, "rshfa")) lInstr |= (0b10 << 4);
 	number = toNum(pArg[2]);
+	if (number > AMOUNT4_MAX || number < AMOUNT4_MIN) errorMsg(2, lineNo);
+	lInstr |= (number & 0b1111);
+  } else if(!strcmp(pOpcode, "not")) {
+    if (pArgc != 2) errorMsg(0, lineNo); /* check the number of operands is 2 */
+	lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
+    lInstr |= (extractRegID(pArg[1]) << 6); /*encode SR1*/
+	lInstr |= 0b1 << 5;
+	lInstr |= 0b11111;
+  } else if(!strcmp(pOpcode, "jmp")) {
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+	lInstr |= (0b000 << 9);
+    lInstr |= (extractRegID(pArg[0]) << 6); /*encode BaseR*/
+	lInstr |= 0b000000;
+  } else if(!strcmp(pOpcode, "trap")) {
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+	lInstr |= (0b1111 << 12);
+	number = toNum(pArg[0]);
+	if (number > TRAPVECT8_MAX || number < TRAPVECT8_MIN) errorMsg(2, lineNo);
+	lInstr |= (number & 0b11111111);
+  } else if(!strcmp(pOpcode, "br") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brp") || !strcmp(pOpcode, "brnz") || !strcmp(pOpcode, "brnp") || !strcmp(pOpcode, "brzp") || !strcmp(pOpcode, "brnzp")) {
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+
+	if(!strcmp(pOpcode, "br")) lInstr |= (0b000 << 9);
+	else if(!strcmp(pOpcode, "brn")) lInstr |= (0b100 << 9);
+	else if(!strcmp(pOpcode, "brz")) lInstr |= (0b010 << 9);
+	else if(!strcmp(pOpcode, "brp")) lInstr |= (0b001 << 9);
+	else if(!strcmp(pOpcode, "brnz")) lInstr |= (0b110 << 9);
+	else if(!strcmp(pOpcode, "brnp")) lInstr |= (0b101 << 9);
+	else if(!strcmp(pOpcode, "brzp")) lInstr |= (0b011 << 9);
+	else if(!strcmp(pOpcode, "brnzp")) lInstr |= (0b111 << 9);
 	
- 
+	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
+	address = extractAddr(pArg[0]);
+	number = address - lineNo - 1; /* incremented PC... */
 
-  }
+	/* if (number > PC9_MAX || number < PC9_MIN) errorMsg(2, lineNo); */
+	lInstr |= (number & 0b111111111);
 
- 
- 
-  
-  }
+  } else if(!strcmp(pOpcode, "lea")) {
+    if (pArgc != 2) errorMsg(0, lineNo); /* check the number of operands is 2 */
+    lInstr |= (extractRegID(pArg[0]) << 9); /*encode DR*/
+
+	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
+	address = extractAddr(pArg[0]);
+	number = address - lineNo - 1; /* incremented PC... */
+
+	/* if (number > PC9_MAX || number < PC9_MIN) errorMsg(2, lineNo); */
+	lInstr |= (number & 0b111111111);
+
+  } else if(!strcmp(pOpcode, "jsr")) {
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+	lInstr |= (0b1 << 11);
+
+	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
+	address = extractAddr(pArg[0]);
+	number = address - lineNo - 1; /* incremented PC... */
+
+	/* if (number > PC11_MAX || number < PC11_MIN) errorMsg(2, lineNo); */
+	lInstr |= (number & 0b11111111111);
+
+  } else if(!strcmp(pOpcode, "jsrr")) {
+	lInstr |= (0b0 << 11);
+	lInstr |= (0b00 << 9);
+    lInstr |= (extractRegID(pArg[0]) << 6); /*encode BaseR*/
+	lInstr |= (0b000000);
+
+  } else if(!strcmp(pOpcode, "halt")) {
+    if (pArgc != 0) errorMsg(0, lineNo); /* check the number of operands is 0 */
+	lInstr = 0b1111000000100101;
+  } else if(!strcmp(pOpcode, "nop")) {
+    if (pArgc != 0) errorMsg(0, lineNo); /* check the number of operands is 0 */
+	lInstr = 0b0000000000000000;
+  } else if(!strcmp(pOpcode, "ret")) {
+    if (pArgc != 0) errorMsg(0, lineNo); /* check the number of operands is 0 */
+	lInstr = 0b1100000111000000;
+  } else if(!strcmp(pOpcode, "rti")) {
+    if (pArgc != 0) errorMsg(0, lineNo); /* check the number of operands is 0 */
+	lInstr = 0b1000000000000000;
+  } else if(!strcmp(pOpcode, ".fill")) {
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+	number = toNum(pArg[0]);
+	if (number > FILL_MAX || number < FILL_MIN) errorMsg(2, lineNo);
+	lInstr |= (number & 0b1111111111111111);
+  } 
   
   fprintf(lOutfile, "0x%.4X\n", lInstr);
 
@@ -470,16 +562,6 @@ int toNum(char * pStr ) {
 	exit(4);
   }
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
