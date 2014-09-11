@@ -49,6 +49,9 @@ typedef struct {
 TableEntry symbolTable[MAX_SYMBOLS];
 int symbolTableSize;
 
+
+int startAddr;
+
 void errorMsg(int errorNo, int lineNo) {
   switch (errorNo) {
   case 0:
@@ -152,7 +155,7 @@ int isOpcode(char *ptr) {
 }
 
 
-int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int *pArgc, char **pArg) {
+int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int *pArgc, char **pArg, int lineNo) {
   char *lRet, *lPtr;
   int i;
 
@@ -199,7 +202,7 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
     pArg[*pArgc] = lPtr;
     (*pArgc)++;
 	if (*pArgc >= 4) {
-	  printf("Error: too many operands\n");
+	  errorMsg(0, lineNo);
 	}
   }
   return (OK);
@@ -208,7 +211,6 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
 void firstPass(char *iFileName) {
   char lLine[MAX_LINE_LENGTH+1], *lLabel, *lOpcode, *lArg[4];
   int lRet, lArgc;
-  int startAddr;
 
   FILE *lInfile;
   int symbolTableIndex = 0;
@@ -217,7 +219,7 @@ void firstPass(char *iFileName) {
 
   lInfile = fopen(iFileName, "r");
   do {
-	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg);
+	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
       printf("line %d: %s\n", lineNo, lLine);
 	  if (lineNo == 0) {
@@ -238,6 +240,7 @@ void firstPass(char *iFileName) {
 		if (lArgc == 1) {
 		  startAddr = toNum(lArg[0]);
 		  printf ("%d\n", startAddr);
+		  if (startAddr % 2) errorMsg(2, lineNo); 
 		} else {
 		  printf("Error: Lacking the first operand or adding extra additional operands\n");
 		  exit(4);
@@ -447,7 +450,7 @@ void secondPass(char *iFileName, char *oFileName) {
   lInfile = fopen(iFileName, "r");
   lOutfile = fopen(oFileName, "w");
   do {
-	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg);
+	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
       printf("line %d: %s\n", lineNo, lLine);
 
@@ -468,6 +471,7 @@ void secondPass(char *iFileName, char *oFileName) {
   */
 
   fclose(lInfile);
+  fclose(lOutfile);
 }
 
 
@@ -493,6 +497,7 @@ int main(int argc, char* argv[]) {
 
   secondPass(iFileName, oFileName);
 
+  /*
   infile = fopen(argv[1], "r");
   outfile = fopen(argv[2], "w");
 
@@ -508,6 +513,7 @@ int main(int argc, char* argv[]) {
 
   fclose(infile);
   fclose(outfile);
+  */
   
 }
 
