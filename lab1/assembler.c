@@ -25,6 +25,10 @@
 //#define FILL_MIN -65536
 #define FILL_MIN -32768
 
+
+#define ORIG_MAX 65535
+#define ORIG_MIN 0
+
 #define PC9_MAX 255
 #define PC9_MIN -256
 
@@ -73,6 +77,10 @@ void errorMsg(int errorNo, int lineNo) {
   case 4:
       printf("Error: Invalid opcode: %d\n", lineNo);
       exit(2);
+	  break;
+  case 5:
+	  printf("Error: Invalid label: %d\n", lineNo);
+	  exit(4);
 	  break;
   default:
       printf("Error: %d\n", lineNo);
@@ -208,6 +216,17 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
   return (OK);
 }
 
+void checkLabel(char *label, int lineNo) {
+  int i;
+  /* Do we need to check if label is an opcode? since we get label only when label is not an opcode */
+  if (!strcmp(label, "in") || !strcmp(label, "out") || !strcmp(label, "getc") || !strcmp(label, "puts") || isOpcode(label) != -1) {printf("1"); errorMsg(5, lineNo);}
+  if (*label == 'x') {printf("2");errorMsg(5, lineNo);}
+  for (i = 0; label[i] != '\0'; ++i) {
+	if (!isalnum(label[i])) {printf("%c", label[i]);errorMsg(5, lineNo);}
+  }
+  return;
+}
+
 void firstPass(char *iFileName) {
   char lLine[MAX_LINE_LENGTH+1], *lLabel, *lOpcode, *lArg[4];
   int lRet, lArgc;
@@ -251,6 +270,8 @@ void firstPass(char *iFileName) {
 	  if (*lLabel != '\0') {
 		//printf("come inside the label branch\n");
 		//symbolTable[symbolTableIndex].address = startAddr + lineNo * 2;
+		checkLabel(lLabel, lineNo);
+
 		symbolTable[symbolTableIndex].address = lineNo;
 		strcpy(symbolTable[symbolTableIndex].label, lLabel);
 		symbolTableIndex++;
@@ -316,6 +337,8 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
   int number, address;
   int lInstr = 0;
 
+  printf("secondPass: %d\n", lineNo);
+
   if (pOpcode[0] != '.') lInstr |= (encodeOpcode(pOpcode, lineNo) << 12); /*encode opcode*/
   if (!strcmp(pOpcode, "add") || !strcmp(pOpcode, "and") || !strcmp(pOpcode, "xor")) {
     if (pArgc != 3) errorMsg(0, lineNo); /* check the number of operands is 3 */
@@ -370,7 +393,7 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
   } else if(!strcmp(pOpcode, "br") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brp") || !strcmp(pOpcode, "brnz") || !strcmp(pOpcode, "brnp") || !strcmp(pOpcode, "brzp") || !strcmp(pOpcode, "brnzp")) {
     if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
 
-	if(!strcmp(pOpcode, "br")) lInstr |= (0b000 << 9);
+	if(!strcmp(pOpcode, "br")) lInstr |= (0b111 << 9);
 	else if(!strcmp(pOpcode, "brn")) lInstr |= (0b100 << 9);
 	else if(!strcmp(pOpcode, "brz")) lInstr |= (0b010 << 9);
 	else if(!strcmp(pOpcode, "brp")) lInstr |= (0b001 << 9);
@@ -381,7 +404,7 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 	
 	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
 	address = extractAddr(pArg[0], lineNo);
-	number = address - lineNo; /* incremented PC... */
+	number = address - lineNo - 1; /* incremented PC... */
 
 	/* if (number > PC9_MAX || number < PC9_MIN) errorMsg(2, lineNo); */
 	lInstr |= (number & 0b111111111);
@@ -392,7 +415,7 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 
 	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
 	address = extractAddr(pArg[1], lineNo);
-	number = address - lineNo; /* incremented PC... */
+	number = address - lineNo - 1; /* incremented PC... */
 
 	/* if (number > PC9_MAX || number < PC9_MIN) errorMsg(2, lineNo); */
 	lInstr |= (number & 0b111111111);
@@ -403,7 +426,7 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 
 	/* if (pArg[0][0] = '#' || pArg[0][0] == 'x') errorMsg(1, lineNo); */
 	address = extractAddr(pArg[0], lineNo);
-	number = address - lineNo; /* incremented PC... */
+	number = address - lineNo - 1; /* incremented PC... */
 
 	/* if (number > PC11_MAX || number < PC11_MIN) errorMsg(2, lineNo); */
 	lInstr |= (number & 0b11111111111);
@@ -431,7 +454,26 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 	number = toNum(pArg[0]);
 	if (number > FILL_MAX || number < FILL_MIN) errorMsg(2, lineNo);
 	lInstr |= (number & 0b1111111111111111);
-  } 
+  } else if (!strcmp(pOpcode, ".orig")) {
+	printf("flag 999\n");
+	if (lineNo != 0) errorMsg(4, lineNo);
+
+	printf("flag 9992\n");
+    if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
+
+	printf("flag 9992\n");
+	number = toNum(pArg[0]);
+
+	printf("flag 9994\n");
+	if (number > ORIG_MAX || number < ORIG_MIN || number % 2) errorMsg(2, lineNo);
+
+	printf("flag 9995\n");
+	lInstr |= (number & 0b1111111111111111);
+
+	printf("flag 9993\n");
+  } else {
+	errorMsg(4, lineNo);
+  }
   
   fprintf(lOutfile, "0x%.4X\n", lInstr);
 
@@ -452,13 +494,10 @@ void secondPass(char *iFileName, char *oFileName) {
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
-      printf("line %d: %s\n", lineNo, lLine);
-
+      printf("sec line %d: %s\n", lineNo, lLine);
 	  genHexCode(lLabel, lOpcode, lArgc, lArg, lOutfile, lineNo);
-
+	  lineNo++;
 	}
-	lineNo++;
-
   } while (lRet != DONE);
 
   printf("%s\n", lLabel);
