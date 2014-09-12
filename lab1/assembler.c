@@ -194,17 +194,16 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
   }
   *pOpcode = lPtr;
 
+  /*
   if (strcmp(*pOpcode, ".end") == 0) {
-	/*No operands after .end is allowed...............NEED to ask the TA................*/
-	/*
+	//No operands after .end is allowed...............NEED to ask the TA................
     if ((lPtr = strtok(NULL, "\t\n ,"))) {
       printf("wrong number of operand\n");	  
 	  exit(4);
 	}
-	*/
 	return (DONE);
   }
-
+  */
   while (1) {
     if (!(lPtr = strtok(NULL, "\t\n ,"))) {return (OK);}
     pArg[*pArgc] = lPtr;
@@ -219,10 +218,10 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, int 
 void checkLabel(char *label, int lineNo) {
   int i;
   /* Do we need to check if label is an opcode? since we get label only when label is not an opcode */
-  if (!strcmp(label, "in") || !strcmp(label, "out") || !strcmp(label, "getc") || !strcmp(label, "puts") || isOpcode(label) != -1) {printf("1"); errorMsg(5, lineNo);}
-  if (*label == 'x') {printf("2");errorMsg(5, lineNo);}
+  if (!strcmp(label, "in") || !strcmp(label, "out") || !strcmp(label, "getc") || !strcmp(label, "puts") || isOpcode(label) != -1) errorMsg(5, lineNo);
+  if (*label == 'x') errorMsg(5, lineNo);
   for (i = 0; label[i] != '\0'; ++i) {
-	if (!isalnum(label[i])) {printf("%c", label[i]);errorMsg(5, lineNo);}
+	if (!isalnum(label[i])) errorMsg(5, lineNo);
   }
   return;
 }
@@ -237,17 +236,20 @@ void firstPass(char *iFileName) {
   int i;
 
   lInfile = fopen(iFileName, "r");
+  if (!lInfile) {
+	printf("Error: Cannot open file\n");
+	exit(4);
+  }
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
       printf("line %d: %s\n", lineNo, lLine);
 	  if (lineNo == 0) {
-		/*
 		if (*lLabel != '\0') {
-		  printf("Error: no label for the first line before .ORIG, %s\n", orig_pStr);
+		  printf("Error: no label for the first line before .ORIG\n");
 	      exit(4);
 		}
-		*/
+
 		if (strcmp(lOpcode, ".orig") != 0) {
 		  printf("Error: The first line should contains .ORIG\n");
 	      exit(4);
@@ -320,11 +322,11 @@ int extractRegID(char *ptr, int lineNo) {
 	if (regID >= 0 && regID <= 7) {
 	  return regID;
 	} else {
+	  printf("hello");
 	  errorMsg(1, lineNo);
 	}
   } else {
-	//error....
-	//printf();
+	  errorMsg(1, lineNo);
   }
 }
 /*
@@ -333,11 +335,9 @@ int isImm(char *ptr) {
 }
 */
 
-void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfile, int lineNo) {
+int genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfile, int lineNo) {
   int number, address;
   int lInstr = 0;
-
-  printf("secondPass: %d\n", lineNo);
 
   if (pOpcode[0] != '.') lInstr |= (encodeOpcode(pOpcode, lineNo) << 12); /*encode opcode*/
   if (!strcmp(pOpcode, "add") || !strcmp(pOpcode, "and") || !strcmp(pOpcode, "xor")) {
@@ -390,7 +390,7 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 	number = toNum(pArg[0]);
 	if (number > TRAPVECT8_MAX || number < TRAPVECT8_MIN) errorMsg(2, lineNo);
 	lInstr |= (number & 0b11111111);
-  } else if(!strcmp(pOpcode, "br") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brp") || !strcmp(pOpcode, "brnz") || !strcmp(pOpcode, "brnp") || !strcmp(pOpcode, "brzp") || !strcmp(pOpcode, "brnzp")) {
+  } else if(!strcmp(pOpcode, "br") || !strcmp(pOpcode, "brn") || !strcmp(pOpcode, "brz") || !strcmp(pOpcode, "brp") || !strcmp(pOpcode, "brnz") || !strcmp(pOpcode, "brnp") || !strcmp(pOpcode, "brzp") || !strcmp(pOpcode, "brnzp")) {
     if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
 
 	if(!strcmp(pOpcode, "br")) lInstr |= (0b111 << 9);
@@ -455,34 +455,25 @@ void genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutf
 	if (number > FILL_MAX || number < FILL_MIN) errorMsg(2, lineNo);
 	lInstr |= (number & 0b1111111111111111);
   } else if (!strcmp(pOpcode, ".orig")) {
-	printf("flag 999\n");
 	if (lineNo != 0) errorMsg(4, lineNo);
-
-	printf("flag 9992\n");
     if (pArgc != 1) errorMsg(0, lineNo); /* check the number of operands is 1 */
-
-	printf("flag 9992\n");
 	number = toNum(pArg[0]);
-
-	printf("flag 9994\n");
 	if (number > ORIG_MAX || number < ORIG_MIN || number % 2) errorMsg(2, lineNo);
-
-	printf("flag 9995\n");
 	lInstr |= (number & 0b1111111111111111);
-
-	printf("flag 9993\n");
+  } else if (!strcmp(pOpcode, ".end")) {
+    if (pArgc != 0) errorMsg(0, lineNo); /* check the number of operands is 0 ...................Do we need to check this???? .end cannot have any operands..... */
+	return 1;
   } else {
 	errorMsg(4, lineNo);
   }
   
   fprintf(lOutfile, "0x%.4X\n", lInstr);
-
+  return 0;
 }
 
 void secondPass(char *iFileName, char *oFileName) {
   char lLine[MAX_LINE_LENGTH+1], *lLabel, *lOpcode, *lArg[4];
   int lRet, lArgc;
-  int startAddr;
 
   FILE *lInfile, *lOutfile;
   int symbolTableIndex = 0;
@@ -491,23 +482,31 @@ void secondPass(char *iFileName, char *oFileName) {
 
   lInfile = fopen(iFileName, "r");
   lOutfile = fopen(oFileName, "w");
+  if (!lInfile) {
+	printf("Error: Cannot open file\n");
+	exit(4);
+  }
+  if (!lOutfile) {
+	printf("Error: Cannot open file\n");
+	exit(4);
+  }
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
       printf("sec line %d: %s\n", lineNo, lLine);
-	  genHexCode(lLabel, lOpcode, lArgc, lArg, lOutfile, lineNo);
+	  if (genHexCode(lLabel, lOpcode, lArgc, lArg, lOutfile, lineNo))
+		break;
 	  lineNo++;
 	}
   } while (lRet != DONE);
 
-  printf("%s\n", lLabel);
+  printf("lOpcode: %s\n", lOpcode);
 
-  /*
-  if (strcmp(lLabel, ".end") != 0) {
+  /* check the last line is ".end" or not, we can also use a flag to judge the return value of genHexCode.... */
+  if (strcmp(lOpcode, ".end") != 0) {
 	printf("Error: The last line should be \".END\"\n");
 	exit(4);
   }
-  */
 
   fclose(lInfile);
   fclose(lOutfile);
