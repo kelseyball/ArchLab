@@ -56,49 +56,7 @@ int symbolTableSize;
 
 int startAddr;
 
-void errorMsg(int errorNo, int lineNo) {
-  switch (errorNo) {
-  case 0:
-      printf("Error: wrong number of operands: %d\n", lineNo);
-      exit(4);
-	  break;
-  case 1:
-      printf("Error: Invalid operand: %d\n", lineNo);
-      exit(4);
-	  break;
-  case 2:
-      printf("Error: Invalid constant: %d\n", lineNo);
-      exit(3);
-	  break;
-  case 3:
-      printf("Error: Undefined label: %d\n", lineNo);
-      exit(1);
-	  break;
-  case 4:
-      printf("Error: Invalid opcode: %d\n", lineNo);
-      exit(2);
-	  break;
-  case 5:
-	  printf("Error: Invalid label: %d\n", lineNo);
-	  exit(4);
-	  break;
-  default:
-      printf("Error: %d\n", lineNo);
-      exit(4);
-  }
-}
 
-
-int extractAddr(char *label, int lineNo) {
-  int i;
-  printf("label: %s\n", label);
-  for (i = 0; i < symbolTableSize; ++i) {
-	if (!strcmp(symbolTable[i].label, label)) {
-	  return symbolTable[i].address;
-	}
-  }
-  errorMsg(3, lineNo);
-}
 
 typedef struct{
   char opcode[5];
@@ -135,6 +93,49 @@ OpcodeEncodingMap opcodeEncodingMap[OPCODE_SIZE] = {
   {"trap",  0b1111},
   {"xor",   0b1001},
 };
+
+void errorMsg(int errorNo, int lineNo) {
+  switch (errorNo) {
+  case 0:
+      printf("Error: wrong number of operands: %d\n", lineNo);
+      exit(4);
+	  break;
+  case 1:
+      printf("Error: Invalid operand: %d\n", lineNo);
+      exit(4);
+	  break;
+  case 2:
+      printf("Error: Invalid constant: %d\n", lineNo);
+      exit(3);
+	  break;
+  case 3:
+      printf("Error: Undefined label: %d\n", lineNo);
+      exit(1);
+	  break;
+  case 4:
+      printf("Error: Invalid opcode: %d\n", lineNo);
+      exit(2);
+	  break;
+  case 5:
+	  printf("Error: Invalid label: %d\n", lineNo);
+	  exit(4);
+	  break;
+  default:
+      printf("Error: %d\n", lineNo);
+      exit(4);
+  }
+}
+
+
+int extractAddr(char *label, int lineNo) {
+  int i;
+  for (i = 0; i < symbolTableSize; ++i) {
+	if (!strcmp(symbolTable[i].label, label)) {
+	  return symbolTable[i].address;
+	}
+  }
+  errorMsg(3, lineNo);
+}
 
 int encodeOpcode(char *opcode, int lineNo) {
   int i;
@@ -255,12 +256,9 @@ void firstPass(char *iFileName) {
 	      exit(4);
 		}
 
-		printf("%s\n", lArg[0]);
-		printf("%d\n", lArgc);
-
 		if (lArgc == 1) {
 		  startAddr = toNum(lArg[0]);
-		  printf ("%d\n", startAddr);
+		  printf ("startAddr:%d\n", startAddr);
 		  if (startAddr % 2) errorMsg(2, lineNo); 
 		} else {
 		  printf("Error: Lacking the first operand or adding extra additional operands\n");
@@ -270,8 +268,7 @@ void firstPass(char *iFileName) {
 	  }
 
 	  if (*lLabel != '\0') {
-		//printf("come inside the label branch\n");
-		//symbolTable[symbolTableIndex].address = startAddr + lineNo * 2;
+		/* symbolTable[symbolTableIndex].address = startAddr + lineNo * 2; */
 		checkLabel(lLabel, lineNo);
 
 		symbolTable[symbolTableIndex].address = lineNo;
@@ -313,7 +310,6 @@ int isReg(char *ptr) {
 
 int extractRegID(char *ptr, int lineNo) {
   int regID;
-  printf("reg:%s\n", ptr);
   if (strlen(ptr) != 2) {
 	errorMsg(1, lineNo);
   }
@@ -329,11 +325,6 @@ int extractRegID(char *ptr, int lineNo) {
 	  errorMsg(1, lineNo);
   }
 }
-/*
-int isImm(char *ptr) {
-  //we can directly use to Num
-}
-*/
 
 int genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfile, int lineNo) {
   int number, address;
@@ -493,14 +484,12 @@ void secondPass(char *iFileName, char *oFileName) {
   do {
 	lRet = readAndParse(lInfile, lLine, &lLabel, &lOpcode, &lArgc, lArg, lineNo);
 	if (lRet != DONE && lRet != EMPTY_LINE) {
-      printf("sec line %d: %s\n", lineNo, lLine);
+      printf("sec pass line %d: %s\n", lineNo, lLine);
 	  if (genHexCode(lLabel, lOpcode, lArgc, lArg, lOutfile, lineNo))
 		break;
 	  lineNo++;
 	}
   } while (lRet != DONE);
-
-  printf("lOpcode: %s\n", lOpcode);
 
   /* check the last line is ".end" or not, we can also use a flag to judge the return value of genHexCode.... */
   if (strcmp(lOpcode, ".end") != 0) {
@@ -535,24 +524,6 @@ int main(int argc, char* argv[]) {
 
   secondPass(iFileName, oFileName);
 
-  /*
-  infile = fopen(argv[1], "r");
-  outfile = fopen(argv[2], "w");
-
-  if (!infile) {
-	printf("Error: Cannot open file %s\n", argv[1]);
-	exit(4);
-  }
-
-  if (!outfile) {
-	printf("Error: Cannot open file %s\n", argv[2]);
-	exit(4);
-  }
-
-  fclose(infile);
-  fclose(outfile);
-  */
-  
 }
 
 int toNum(char * pStr ) {
@@ -608,7 +579,5 @@ int toNum(char * pStr ) {
 	exit(4);
   }
 }
-
-
 
 
