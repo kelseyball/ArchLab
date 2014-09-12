@@ -22,7 +22,7 @@
 #define TRAPVECT8_MIN 0
 
 #define FILL_MAX 65535
-//#define FILL_MIN -65536
+/* #define FILL_MIN -65536 */
 #define FILL_MIN -32768
 
 
@@ -36,7 +36,7 @@
 #define PC11_MIN -1024
 
 
-const char *opcode[] = {"add", "and", "br", "brn", "brz", "brp", "brnp", "brnz", "brzp", "brnzp", "halt", "jmp", "jsr", "jsrr", "ldb", "ldw", "lea", "nop", "not", "ret", "rti", "lshf", "rshfl", "rshfa", "stb", "stw", "trap", "xor"};
+const char *LC3b_opcode[] = {"add", "and", "br", "brn", "brz", "brp", "brnp", "brnz", "brzp", "brnzp", "halt", "jmp", "jsr", "jsrr", "ldb", "ldw", "lea", "nop", "not", "ret", "rti", "lshf", "rshfl", "rshfa", "stb", "stw", "trap", "xor"};
 
 /*
  * brn, brp, brnp, br, brz, brnz, brzp, brnzp; How to handle with it?
@@ -147,7 +147,6 @@ int encodeOpcode(char *opcode, int lineNo) {
   printf("error");
   errorMsg(4, lineNo); 
   return -1;
-  //error....
 }
 
 FILE* infile = NULL;
@@ -156,7 +155,7 @@ FILE* outfile = NULL;
 int isOpcode(char *ptr) {
   int i;
   for (i = 0; i < OPCODE_SIZE; ++i) {
-	if (strcmp(ptr, opcode[i]) == 0) {
+	if (strcmp(ptr, LC3b_opcode[i]) == 0) {
 	  return 0;
 	}
   }
@@ -220,10 +219,23 @@ void checkLabel(char *label, int lineNo) {
   int i;
   /* Do we need to check if label is an opcode? since we get label only when label is not an opcode */
   if (!strcmp(label, "in") || !strcmp(label, "out") || !strcmp(label, "getc") || !strcmp(label, "puts") || isOpcode(label) != -1) errorMsg(5, lineNo);
+
+  if (strlen(label) > MAX_LABEL_LEN) errorMsg(5, lineNo);
+
   if (*label == 'x') errorMsg(5, lineNo);
   for (i = 0; label[i] != '\0'; ++i) {
 	if (!isalnum(label[i])) errorMsg(5, lineNo);
   }
+
+  /*
+  for (i = 0; i < symbolTableSize; ++i) {
+	if (!strcmp(symbolTable[i].label, label)) {
+	  errorMsg(5, lineNo); // duplicated label
+	}
+  }
+  */
+
+
   return;
 }
 
@@ -274,6 +286,7 @@ void firstPass(char *iFileName) {
 		symbolTable[symbolTableIndex].address = lineNo;
 		strcpy(symbolTable[symbolTableIndex].label, lLabel);
 		symbolTableIndex++;
+        symbolTableSize = symbolTableIndex;
 	  }
 	  lineNo++;
 	}
