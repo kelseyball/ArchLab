@@ -360,7 +360,7 @@ int genHexCode(char *pLabel, char *pOpcode, int pArgc, char **pArg, FILE *lOutfi
     lInstr |= (extractRegID(pArg[1], lineNo) << 6); /*encode SR1*/
 	if(!strcmp(pOpcode, "lshf")) lInstr |= (0b00 << 4);
 	else if(!strcmp(pOpcode, "rshfl")) lInstr |= (0b01 << 4);
-	else if(!strcmp(pOpcode, "rshfa")) lInstr |= (0b10 << 4);
+	else if(!strcmp(pOpcode, "rshfa")) lInstr |= (0b11 << 4);
 	number = toNum(pArg[2]);
 	if (number > AMOUNT4_MAX || number < AMOUNT4_MIN) errorMsg(2, lineNo);
 	lInstr |= (number & 0b1111);
