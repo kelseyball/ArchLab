@@ -13,8 +13,7 @@
 /***************************************************************/
 
 #include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdio.h> #include <stdlib.h>
 #include <string.h>
 
 /***************************************************************/
@@ -328,9 +327,30 @@ void load_program(char *program_filename) {
 
   printf("Read %d words from program into memory.\n\n", ii);
 
+
+  /*
+  {
+	int address;
     CURRENT_LATCHES.REGS[1] = 4;
-	CURRENT_LATCHES.REGS[5] = 0xffff;
-	CURRENT_LATCHES.REGS[6] = 1;
+	CURRENT_LATCHES.REGS[5] = -1;
+	CURRENT_LATCHES.REGS[6] = 2;
+
+	MEMORY[((0x5000) >> 1)][0] = 0x48;
+	MEMORY[0x5002 >> 1][0] = 0x65;
+	MEMORY[0x5004 >> 1][0] = 0x6c;
+	MEMORY[0x5006 >> 1][0] = 0x6c;
+	MEMORY[0x5008 >> 1][0] = 0x6f;
+	MEMORY[0x500a >> 1][0] = 0x21;
+	MEMORY[0x500c >> 1][0] = 0x0;
+	MEMORY[0x2000][1] = 0x50;
+	MEMORY[0x2001][1] = 0x55;
+
+	printf("flag1...\n");
+  for (address = (0x5000 >> 1); address <= (0x5010 >> 1); address++)
+    printf("  0x%0.4x (%d) : 0x%0.2x%0.2x\n", address << 1, address << 1, MEMORY[address][1], MEMORY[address][0]);
+  printf("\n");
+  }
+  */
 
 
 }
@@ -554,7 +574,7 @@ void execLDB(int instr) {
   dr = (instr >> 9) & 0x7; /* 0b111 */
   baser = (instr >> 6) & 0x7; /* 0b111 */
   boffset6 = instr & 0x3F; /* 0b111111 */
-  CURRENT_LATCHES.REGS[dr] = Low16bits(sext(MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)),8));
+  CURRENT_LATCHES.REGS[dr] = Low16bits(sext(0xFF & MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)),8));
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
@@ -680,7 +700,7 @@ void process_instruction(){
 		break;
 
 	  default:
-		//error?
+		/* error? */
 		printf("opcode is 0x10 or 0x11, not used opcode!*");
 		break;
 	}
