@@ -445,10 +445,13 @@ int sext(int sign, int num, int digits) {
 }
 */
 
+/*
 #define OPCODE(x) 
-#define DR(x) (((x) >> 9) & 0x7) /* 0b111 */
-#define SR1(x) (((x) >> 6) & 0x7) /* 0b111 */
-
+#define DR(x) (((x) >> 9) & 0x7)
+#define SR1(x) (((x) >> 6) & 0x7)
+*/
+#define MEMBYTE(x) MEMORY[(Low16bits(x)) >> 1][(Low16bits(x)) & 0x1]
+#define MEMWORD(x) (((MEMORY[(Low16bits(x)) >> 1][1]) << 8) + ((MEMORY[(Low16bits(x)) >> 1][0]) & 0xFF) )
 
 void execADD(int instr) {
   int dr, sr1, sr2, steer5, imm5;
@@ -545,10 +548,6 @@ void execJSR(int instr) {
 }
 
 
-#define MEMBYTE(x) MEMORY[(Low16bits(x)) >> 1][(Low16bits(x)) & 0x1]
-
-#define MEMWORD(x) (((MEMORY[(Low16bits(x)) >> 1][1]) << 8) + ((MEMORY[(Low16bits(x)) >> 1][0]) & 0xFF) )
-
 
 void execLDB(int instr) {
   int dr, baser, boffset6;
@@ -564,25 +563,46 @@ void execLDW(int instr) {
   dr = (instr >> 9) & 0x7; /* 0b111 */
   baser = (instr >> 6) & 0x7; /* 0b111 */
   offset6 = instr & 0x3F; /* 0b111111 */
-  CURRENT_LATCHES.REGS[dr] = Low16bits(sext(MEMWORD(CURRENT_LATCHES.REGS[baser] + (sext(offset6, 6) << 1)),8));
+  CURRENT_LATCHES.REGS[dr] = Low16bits(MEMWORD(CURRENT_LATCHES.REGS[baser] + (sext(offset6, 6) << 1)));
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
 
-}
-
 void execLEA(int instr) {
+  int dr, pcoffset9;
+  dr = (instr >> 9) & 0x7; /* 0b111 */
+  pcoffset9 = instr & 0x1FF;
+  CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.PC + (sext(pcoffset9, 9) << 1));
 }
 
 void execSTB(int instr) {
+  int sr, baser, boffset6;
+  sr = (instr >> 9) & 0x7; /* 0b111 */
+  baser = (instr >> 6) & 0x7; /* 0b111 */
+  boffset6 = instr & 0x3F; /* 0b111111 */
+  MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)) =  CURRENT_LATCHES.REGS[sr] & 0xFF; /* 0x11111111 */
 }
 
 void execSTW(int instr) {
+  int sr, baser, offset6;
+  sr = (instr >> 9) & 0x7; /* 0b111 */
+  baser = (instr >> 6) & 0x7; /* 0b111 */
+  offset6 = instr & 0x3F; /* 0b111111 */
+
+  MEMBYTE(CURRENT_LATCHES.REGS[baser] + (sext(offset6, 6) << 1)) = Low16bits(CURRENT_LATCHES.REGS[sr]) & 0xFF;
+  MEMBYTE(CURRENT_LATCHES.REGS[baser] + (sext(offset6, 6) << 1) + 1) = (Low16bits(CURRENT_LATCHES.REGS[sr]) & 0xFF00) >> 8;
 }
 
 void execTRAP(int instr) {
+  int trapvect8;
+  trapvect8 = instr & 0xFF; /* 0x11111111 */
+  CURRENT_LATCHES.REGS[7] = CURRENT_LATCHES.PC;
+  CURRENT_LATCHES.PC = Low16bits(MEMWORD(trapvect8 << 1));
 }
-	
+
+void execRTI(int instr) {
+  printf("RTI is not implemented yet");
+}
 
 void process_instruction(){
   /*  function: process_instruction
@@ -602,8 +622,7 @@ void process_instruction(){
 
 	printf("pc: 0x%x\n", pc);
 	printf("instr: %x\n", instr);
-	printf("0x%x\n", MEMORY[pc/2][1]);
-	printf("0x%x\n", MEMORY[pc/2][0]);
+	printf("0x%x\n", MEMORY[pc/2][1]); printf("0x%x\n", MEMORY[pc/2][0]);
 
 
 	opcode = (instr & 0xF000) >> 12;
@@ -668,10 +687,6 @@ void process_instruction(){
 
     NEXT_LATCHES = CURRENT_LATCHES;
 }
-
-
-
-
 
 
 
