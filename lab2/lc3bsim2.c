@@ -13,7 +13,8 @@
 /***************************************************************/
 
 #include <assert.h>
-#include <stdio.h> #include <stdlib.h>
+#include <stdio.h> 
+#include <stdlib.h>
 #include <string.h>
 
 /***************************************************************/
@@ -345,7 +346,6 @@ void load_program(char *program_filename) {
 	MEMORY[0x2000][1] = 0x50;
 	MEMORY[0x2001][1] = 0x55;
 
-	printf("flag1...\n");
   for (address = (0x5000 >> 1); address <= (0x5010 >> 1); address++)
     printf("  0x%0.4x (%d) : 0x%0.2x%0.2x\n", address << 1, address << 1, MEMORY[address][1], MEMORY[address][0]);
   printf("\n");
@@ -621,7 +621,7 @@ void execTRAP(int instr) {
 }
 
 void execRTI(int instr) {
-  printf("RTI is not implemented yet");
+  printf("RTI is not implemented yet\n");
 }
 
 void process_instruction(){
@@ -636,18 +636,16 @@ void process_instruction(){
 
     int pc, opcode, instr = 0;
 	pc = CURRENT_LATCHES.PC;
-	instr = 0;
-	instr |= MEMORY[pc >> 1][0];
-	instr |= MEMORY[pc >> 1][1] << 8;
+	instr = Low16bits(MEMWORD(pc));
 
+	/*
 	printf("pc: 0x%x\n", pc);
 	printf("instr: %x\n", instr);
 	printf("0x%x\n", MEMORY[pc/2][1]); printf("0x%x\n", MEMORY[pc/2][0]);
+	*/
 
 
 	opcode = (instr & 0xF000) >> 12;
-
-	printf("opcode:0x%x\n", opcode);
 
 	CURRENT_LATCHES.PC += 2;
 	/*
