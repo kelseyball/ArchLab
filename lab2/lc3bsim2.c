@@ -450,7 +450,7 @@ int sext(int sign, int num, int digits) {
 #define SR1(x) (((x) >> 6) & 0x7) /* 0b111 */
 
 
-void execADD(instr) {
+void execADD(int instr) {
   int dr, sr1, sr2, steer5, imm5;
   dr = (instr >> 9) & 0x7; /* 0b111 */
   sr1 = (instr >> 6) & 0x7; /* 0b111 */
@@ -465,7 +465,7 @@ void execADD(instr) {
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
-void execAND(instr) {
+void execAND(int instr) {
   int dr, sr1, sr2, steer5, imm5;
   dr = (instr >> 9) & 0x7; /* 0b111 */
   sr1 = (instr >> 6) & 0x7; /* 0b111 */
@@ -480,7 +480,7 @@ void execAND(instr) {
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
-void execXOR(instr) {
+void execXOR(int instr) {
   int dr, sr1, sr2, steer5, imm5;
   dr = (instr >> 9) & 0x7; /* 0b111 */
   sr1 = (instr >> 6) & 0x7; /* 0b111 */
@@ -495,7 +495,7 @@ void execXOR(instr) {
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
-void execSHF(instr) {
+void execSHF(int instr) {
   int dr, sr1, steer45, amount4;
   dr = (instr >> 9) & 0x7; /* 0b111 */
   sr1 = (instr >> 6) & 0x7; /* 0b111 */
@@ -511,45 +511,76 @@ void execSHF(instr) {
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
 
-void execBR(instr) {
+void execBR(int instr) {
   int n, z, p, pcoffset9;
   n = (instr >> 11) & 0x1;
   z = (instr >> 10) & 0x1;
   p = (instr >> 9) & 0x1;
   pcoffset9 = instr & 0x1FF;
   if ((n & CURRENT_LATCHES.N) || (z & CURRENT_LATCHES.Z) || (p & CURRENT_LATCHES.P)) {
-	CURRENT_LATCHES.PC += (sext(pcoffset9, 9) << 1); /* What if BR to somewhere out of border? Impossible...Because assembler get the address by label, the label address should exist... -> start: 0xFFFF, then label: ****?, but load_program will handle this case*/
+	CURRENT_LATCHES.PC = Low16bits(CURRENT_LATCHES.PC + (sext(pcoffset9, 9) << 1)); /* What if BR to somewhere out of border? Impossible...Because assembler get the address by label, the label address should exist... -> start: 0xFFFF, then label: ****?, but load_program will handle this case*/
   }
 }
 
-void execJMP(instr) {
+/* JMP, RET */
+void execJMP(int instr) {
+  int baser;
+  baser = (instr >> 6) & 0x7; /* 0b111 */	
+  CURRENT_LATCHES.PC = Low16bits(CURRENT_LATCHES.REGS[baser]);
+}
+
+/* JSR, JSRR */
+void execJSR(int instr) {
+  int temp, steer11, baser, pcoffset11;
+  steer11 = (instr >> 11) & 0x1;
+  temp = CURRENT_LATCHES.PC;
+  if (!steer11) {
+    baser = (instr >> 6) & 0x7; /* 0b111 */	
+	CURRENT_LATCHES.PC = Low16bits(CURRENT_LATCHES.REGS[baser]);
+  } else {
+	pcoffset11 = instr & 0x7FF; /* 0b11111111111 */
+	CURRENT_LATCHES.PC = Low16bits(CURRENT_LATCHES.PC + (sext(pcoffset11, 11) << 1));
+  }
+  CURRENT_LATCHES.REGS[7] = temp;
+}
+
+
+#define MEMBYTE(x) MEMORY[(Low16bits(x)) >> 1][(Low16bits(x)) & 0x1]
+
+#define MEMWORD(x) (((MEMORY[(Low16bits(x)) >> 1][1]) << 8) + ((MEMORY[(Low16bits(x)) >> 1][0]) & 0xFF) )
+
+
+void execLDB(int instr) {
+  int dr, baser, boffset6;
+  dr = (instr >> 9) & 0x7; /* 0b111 */
+  baser = (instr >> 6) & 0x7; /* 0b111 */
+  boffset6 = instr & 0x3F; /* 0b111111 */
+  CURRENT_LATCHES.REGS[dr] = Low16bits(sext(MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)),8));
+  setcc(CURRENT_LATCHES.REGS[dr]);
+}
+
+void execLDW(int instr) {
+  int dr, baser, offset6;
+  dr = (instr >> 9) & 0x7; /* 0b111 */
+  baser = (instr >> 6) & 0x7; /* 0b111 */
+  offset6 = instr & 0x3F; /* 0b111111 */
+  CURRENT_LATCHES.REGS[dr] = Low16bits(sext(MEMWORD(CURRENT_LATCHES.REGS[baser] + (sext(offset6, 6) << 1)),8));
+  setcc(CURRENT_LATCHES.REGS[dr]);
+}
+
 
 }
 
-void execJSR(instr) {
+void execLEA(int instr) {
 }
 
-void execLDB(instr) {
-
+void execSTB(int instr) {
 }
 
-void execLDW(instr) {
+void execSTW(int instr) {
 }
 
-
-void execLDW(instr) {
-}
-
-void execLEA(instr) {
-}
-
-void execSTB(instr) {
-}
-
-void execSTW(instr) {
-}
-
-void execTRAP(instr) {
+void execTRAP(int instr) {
 }
 	
 
