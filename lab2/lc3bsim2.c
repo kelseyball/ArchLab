@@ -180,6 +180,7 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
   for (address = (start >> 1); address <= (stop >> 1); address++)
     fprintf(dumpsim_file, " 0x%0.4x (%d) : 0x%0.2x%0.2x\n", address << 1, address << 1, MEMORY[address][1], MEMORY[address][0]);
   fprintf(dumpsim_file, "\n");
+  fflush(dumpsim_file);
 }
 
 /***************************************************************/
@@ -213,6 +214,7 @@ void rdump(FILE * dumpsim_file) {
   for (k = 0; k < LC_3b_REGS; k++)
     fprintf(dumpsim_file, "%d: 0x%0.4x\n", k, CURRENT_LATCHES.REGS[k]);
   fprintf(dumpsim_file, "\n");
+  fflush(dumpsim_file);
 }
 
 /***************************************************************/
@@ -525,11 +527,11 @@ void execSHF(int instr) {
   amount4 = instr & 0xF; /* 0b1111 */
   steer45 = (instr >> 4) & 0x3; /* 0b11 */
   if (!steer45) {
-	CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] << sext(amount4, 4));
+	CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] << amount4 );
   } else if (steer45 == 1) {
-	CURRENT_LATCHES.REGS[dr] = Low16bits((unsigned int)CURRENT_LATCHES.REGS[sr1] >> sext(amount4, 4));
+	CURRENT_LATCHES.REGS[dr] = Low16bits((unsigned int)CURRENT_LATCHES.REGS[sr1] >> amount4);
   } else {
-	CURRENT_LATCHES.REGS[dr] = Low16bits(CURRENT_LATCHES.REGS[sr1] >> sext(amount4, 4));
+	CURRENT_LATCHES.REGS[dr] = Low16bits(sext(CURRENT_LATCHES.REGS[sr1], 16) >> amount4);
   }
   setcc(CURRENT_LATCHES.REGS[dr]);
 }
@@ -600,7 +602,7 @@ void execSTB(int instr) {
   sr = (instr >> 9) & 0x7; /* 0b111 */
   baser = (instr >> 6) & 0x7; /* 0b111 */
   boffset6 = instr & 0x3F; /* 0b111111 */
-  MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)) =  CURRENT_LATCHES.REGS[sr] & 0xFF; /* 0x11111111 */
+  MEMBYTE(CURRENT_LATCHES.REGS[baser] + sext(boffset6, 6)) =  CURRENT_LATCHES.REGS[sr] & 0x00FF; /* 0x11111111 */
 }
 
 void execSTW(int instr) {
