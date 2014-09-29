@@ -588,7 +588,7 @@ void eval_micro_sequencer() {
 	J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
 	COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
-	and1 = !(COND & 0x1) & ((COND >> 1) & 0x1) & CURRENT_LATCHES.READY;
+	and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
 	and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
 	J5 = (J >> 5) & 0x1;
 	J4 = (J >> 4) & 0x1;
@@ -598,6 +598,7 @@ void eval_micro_sequencer() {
 	J0 = (J) & 0x1;
 	NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + (J4 << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
   }
+  printf("READY:%d\n", CURRENT_LATCHES.READY);
   memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[NEXT_LATCHES.STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
 }
 
@@ -629,16 +630,17 @@ void cycle_memory() {
 	  memory_cycle++;
 	}
   } else {
-	if (memory_cycle == 4) {
-	  CURRENT_LATCHES.READY = 1;
+	if (memory_cycle == 3) {
+	  NEXT_LATCHES.READY = 1;
 	  memory_cycle++;
-	} else if (memory_cycle == 5) {
-	  CURRENT_LATCHES.READY = 0;
-	  memory_cycle++;
+	} else if (memory_cycle == 4) {
+	  NEXT_LATCHES.READY = 0;
+	  memory_cycle = 0;
 	} else {
 	  memory_cycle++;
 	}
   }
+  printf("memory_cycle:%d\n", memory_cycle);
 }
 
 enum BUS_DRIVER {
