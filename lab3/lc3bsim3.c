@@ -581,7 +581,7 @@ void eval_micro_sequencer() {
    * Evaluate the address of the next state according to the 
    * micro sequencer logic. Latch the next microinstruction.
    */
-  int J, COND, and2, and1, and0, J5, J4, J3, J2, J1;
+  int J, COND, and2, and1, and0, J5, J4, J3, J2, J1, J0;
   if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
   } else {
@@ -596,9 +596,9 @@ void eval_micro_sequencer() {
 	J2 = (J >> 2) & 0x1;
 	J1 = (J >> 1) & 0x1;
 	J0 = (J) & 0x1;
-	NEXT_LATCHES.STATENUMBER = (J5 << 5) + (J4 << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
+	NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + (J4 << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
   }
-  memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[NEXT_LATCHES.STATENUMBER], sizeof(int)*CONTROL_STORE_BITS);
+  memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[NEXT_LATCHES.STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
 }
 
 
@@ -633,10 +633,10 @@ void cycle_memory() {
 	  CURRENT_LATCHES.READY = 1;
 	  memory_cycle++;
 	} else if (memory_cycle == 5) {
-	  CURRENT_LACHES.READY = 0;
+	  CURRENT_LATCHES.READY = 0;
 	  memory_cycle++;
 	} else {
-	  memery_cycle++;
+	  memory_cycle++;
 	}
   }
 }
@@ -720,7 +720,7 @@ int AddrAdditor() {
 	OFFSET = OFFSET << 1;
   }
   if (!GetADDR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	BASE = PC;
+	BASE = CURRENT_LATCHES.PC;
   } else {
 	if (GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  SR1 = GETREG(9);
@@ -738,10 +738,10 @@ void drive_bus() {
    * Datapath routine for driving the bus from one of the 5 possible 
    * tristate drivers. 
    */       
-  int SR1, SR2, OP1, OP2, BASE, OFFSET;
+  int SR1, SR2, OP1, OP2, steer;
   if (bus_driver == GATE_MARMUX_DRIVER) {
 	/*????????? DOUBLE CHECK here??? No sign extension*/
-	if(!GetMARMUX(CURRENT_LATCHES.MICROSTRUCTION)) {
+	if(!GetMARMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  BUS = Low16bits((unsigned)GETNUM(8) << 1);
 	} else {
 	  BUS = AddrAdditor();
@@ -915,7 +915,7 @@ void latch_datapath_values() {
   }
 
   if (GetLD_BEN(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)))
+	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)));
   }
 
   if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION) && GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)) {
