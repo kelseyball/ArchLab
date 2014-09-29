@@ -602,6 +602,9 @@ void eval_micro_sequencer() {
 }
 
 
+int no_memory_access = 1;
+int memory_cycle = 0;
+
 void cycle_memory() {
  
   /* 
@@ -611,13 +614,42 @@ void cycle_memory() {
    * cycle to prepare microsequencer for the fifth cycle.  
    */
   /* We need one flag to record whether it is the first time we have MIO_EN for the same state */
-  if () {
+  /*
+  if (no_memory_access) {
+	if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  no_memory_acccess = 0;
+	}
 
   } else {
   }
+  */
+  /* NEED TO DOUBLE CHECK HERE!!!! */
+  if (!memory_cycle) {
+	if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  memory_cycle++;
+	}
+  } else {
+	if (memory_cycle == 4) {
+	  CURRENT_LATCHES.READY = 1;
+	  memory_cycle++;
+	} else if (memory_cycle == 5) {
+	  CURRENT_LACHES.READY = 0;
+	  memory_cycle++;
+	} else {
+	  memery_cycle++;
+	}
+  }
 }
 
-
+enum BUS_DRIVER {
+  GATE_MARMUX_DRIVER,
+  GATE_PC_DRIVER,
+  GATE_ALU_DRIVER,
+  GATE_SHF_DRIVER,
+  GATE_MDR_DRIVER,
+  EMPTY_DRIVER,
+} BUS_DRIVER;
+int bus_driver;
 
 void eval_bus_drivers() {
 
@@ -630,7 +662,19 @@ void eval_bus_drivers() {
    *		 Gate_SHF,
    *		 Gate_MDR.
    */    
-
+  if (GetGATE_MARMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_MARMUX_DRIVER;
+  } else if (GetGATE_PC(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_PC_DRIVER;
+  } else if (GetGATE_ALU(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_ALU_DRIVER;
+  } else if (GetGATE_SHF(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_SHF_DRIVER;
+  } else if (GetGATE_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_MDR_DRIVER;
+  } else {
+	bus_driver = EMPTY_DRIVER;
+  }
 }
 
 
@@ -640,6 +684,7 @@ void drive_bus() {
    * Datapath routine for driving the bus from one of the 5 possible 
    * tristate drivers. 
    */       
+
 
 }
 
@@ -654,3 +699,5 @@ void latch_datapath_values() {
    */       
 
 }
+
+
