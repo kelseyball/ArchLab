@@ -693,6 +693,45 @@ int sext(int num, int digits) {
 /* x is the bit number */
 #define GETNUM(x) ((CURRENT_LATCHES.IR) & ((1 << (x)) - 1))
 
+
+int AddrAdditor() {
+  int SR1, BASE, OFFSET;
+  /* ???????????????DOUBLE check whether we should concat/cut off OFFSET into 16 bits???? */
+  switch (GetADDR2MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	case 0:
+	  OFFSET = 0;
+	  break;
+	case 1:
+	  OFFSET = sext(GETNUM(6), 6);
+	  break;
+	case 2:
+	  OFFSET = sext(GETNUM(9), 9);
+	  break;
+	case 3:
+	  OFFSET = sext(GETNUM(11), 11);
+	  break;
+	default:
+	  printf("impossible...");
+	  OFFSET = 0;
+	  break;
+  }
+  /* DO we need to cut off OFFSET?????????????*/
+  if (!GetLSHF1(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	OFFSET = OFFSET << 1;
+  }
+  if (!GetADDR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	BASE = PC;
+  } else {
+	if (GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  SR1 = GETREG(9);
+	} else {
+	  SR1 = GETREG(6); 
+	}
+	BASE = SR1;
+  }
+  return Low16bits(BASE + OFFSET);
+}
+
 void drive_bus() {
 
   /* 
@@ -701,45 +740,11 @@ void drive_bus() {
    */       
   int SR1, SR2, OP1, OP2, BASE, OFFSET;
   if (bus_driver == GATE_MARMUX_DRIVER) {
-	if (GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  SR1 = GETREG(9);
-	} else {
-	  SR1 = GETREG(6); 
-	}
-
-	/* ???????????????DOUBLE check whether we should concat/cut off OFFSET into 16 bits???? */
-	switch (GetADDR2MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  case 0:
-		OFFSET = 0;
-		break;
-	  case 1:
-		OFFSET = sext(GETNUM(6), 6);
-		break;
-	  case 2:
-		OFFSET = sext(GETNUM(9), 9);
-		break;
-	  case 3:
-		OFFSET = sext(GETNUM(11), 11);
-		break;
-	  default:
-		printf("impossible...");
-		OFFSET = 0;
-		break;
-	}
-	/* DO we need to cut off OFFSET?????????????*/
-	if (!GetLSHF1(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  OFFSET = OFFSET << 1;
-	}
-	if (!GetADDR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  BASE = PC;
-	} else {
-	  BASE = SR1;
-	}
 	/*????????? DOUBLE CHECK here??? No sign extension*/
 	if(!GetMARMUX(CURRENT_LATCHES.MICROSTRUCTION)) {
 	  BUS = Low16bits((unsigned)GETNUM(8) << 1);
 	} else {
-	  BUS = Low16bits(BASE + OFFSET);
+	  BUS = AddrAdditor();
 	}
   } else if (bus_driver == GATE_PC_DRIVER) {
 	BUS = CURRENT_LATCHES.PC;
@@ -834,6 +839,12 @@ void setcc(int res) {
 }
 
 
+
+#define GETBIT(x) (((CURRENT_LATCHES.IR) >> (x)) & 0x1)
+#define MEMBYTE(x) MEMORY[(Low16bits(x)) >> 1][(Low16bits(x)) & 0x1]
+#define MEMWORD(x) (Low16bits(((MEMORY[(Low16bits(x)) >> 1][1]) << 8) + ((MEMORY[(Low16bits(x)) >> 1][0]) & 0xFF)))
+
+
 void latch_datapath_values() {
 
   /* 
@@ -842,23 +853,30 @@ void latch_datapath_values() {
    * require sourcing the bus; therefore, this routine has to come 
    * after drive_bus.
    */
-  int ;
   if (GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
   } 
+
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	if (!GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  if (!GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	if (!GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) { /* Read from BUS */
+	  if (!GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) { /* BYTE */
+		/*
 		if (CURRENT_LATCHES.MAR & 0x1) {
-		  CURRENT_LATCHES.MDR = BUS && 0x00FF
+		  CURRENT_LATCHES.MDR = BUS && 0x00FF;
 		} else {
 
 		}
-	  } else {
-		MDR = Low16bits(BUS);
+		*/
+		NEXT_LATCHES.MDR = ((BUS && 0xFF) << 8) + (BUS && 0xFF);
+	  } else { /* WORD */
+		NEXT_LATCHES.MDR = Low16bits(BUS);
 	  }
-	} else {
-
+	} else { /* Read from Memory */
+	  if (CURRENT_LATCHES.READY) {
+		NEXT_LATCHES.MDR = MEMWORD(CURRENT_LATCHES.MAR);
+	  } else {
+		NEXT_LATCHES.MDR = CURRENT_LATCHES.MDR;
+	  }
 	}
   } 
 
@@ -888,7 +906,7 @@ void latch_datapath_values() {
 		NEXT_LATCHES.PC = Low16bits(BUS);
 		break;
 	  case 2:
-
+		NEXT_LATCHES.PC = AddrAdditor();
 		break;
 	  default:
 		printf("impossible...");
@@ -897,11 +915,21 @@ void latch_datapath_values() {
   }
 
   if (GetLD_BEN(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)))
   }
 
-  if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
+  if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION) && GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  MEMBYTE(CURRENT_LATCHES.MAR) = Low16bits(CURRENT_LATCHES.MDR & 0xFF);
+	  MEMBYTE(CURRENT_LATCHES.MAR + 1) = Low16bits((CURRENT_LATCHES.MDR >> 8) & 0xFF);
+	} else {
+	  if (CURRENT_LATCHES.MAR & 0x1) {
+		MEMBYTE(CURRENT_LATCHES.MAR) = (CURRENT_LATCHES.MDR >> 8) & 0xFF;
+	  } else {
+		MEMBYTE(CURRENT_LATCHES.MAR) = CURRENT_LATCHES.MDR & 0xFF;
+	  }
+	}
   }
-
 
 }
 
