@@ -499,16 +499,16 @@ void load_program(char *program_filename) {
 
     printf("Read %d words from program into memory.\n\n", ii);
 
+	/*
 	   {
 	   int address;
 	   CURRENT_LATCHES.REGS[1] = 4;
-	   /* CURRENT_LATCHES.REGS[5] = -1; */
+	   CURRENT_LATCHES.REGS[5] = -1;
 	   CURRENT_LATCHES.REGS[3] = 0xa;
 	   CURRENT_LATCHES.REGS[4] = 0xc;
 	   CURRENT_LATCHES.REGS[5] = 0x7FFF;
 	   CURRENT_LATCHES.REGS[6] = 2;
 
-	   /*
 	   MEMORY[((0x5000) >> 1)][0] = 0x48;
 	   MEMORY[0x5002 >> 1][0] = 0x65;
 	   MEMORY[0x5004 >> 1][0] = 0x6c;
@@ -522,8 +522,8 @@ void load_program(char *program_filename) {
 	   for (address = (0x5000 >> 1); address <= (0x5010 >> 1); address++)
 	   printf("  0x%0.4x (%d) : 0x%0.2x%0.2x\n", address << 1, address << 1, MEMORY[address][1], MEMORY[address][0]);
 	   printf("\n");
-	   */
 	   }
+	   */
 
 }
 
@@ -788,7 +788,7 @@ void drive_bus() {
 	} else {
 	  SR2 = GETREG(0);
 	}
-	printf("SR1: %d; SR2: %d\n", SR1, SR2);
+	/* printf("SR1: %d; SR2: %d\n", SR1, SR2); */
 	switch(GetALUK(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  case 0:
 		BUS = Low16bits(SR1 + SR2);
