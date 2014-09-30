@@ -296,16 +296,6 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
 void rdump(FILE * dumpsim_file) {                               
     int k; 
 
-	/*????????????????????????????*/
-    printf("\nBEN : %d\n\n", CURRENT_LATCHES.BEN);
-
-
-
-
-
-
-
-
     printf("\nCurrent register/bus values :\n");
     printf("-------------------------------------\n");
     printf("Cycle Count  : %d\n", CYCLE_COUNT);
@@ -513,6 +503,8 @@ void load_program(char *program_filename) {
 	   int address;
 	   CURRENT_LATCHES.REGS[1] = 4;
 	   /* CURRENT_LATCHES.REGS[5] = -1; */
+	   CURRENT_LATCHES.REGS[3] = 0xa;
+	   CURRENT_LATCHES.REGS[4] = 0xc;
 	   CURRENT_LATCHES.REGS[5] = 0x7FFF;
 	   CURRENT_LATCHES.REGS[6] = 2;
 
@@ -822,7 +814,7 @@ void drive_bus() {
 	  SR1 = GETREG(6); 
 	}
 	OP1 = GETNUM(4);
-	steer = ((CURRENT_LATCHES.IR) >> 4) & 0x11;
+	steer = ((CURRENT_LATCHES.IR) >> 4) & 0x3;
 	switch(steer) {
 	  case 0:
 		BUS = Low16bits(SR1 << OP1);
