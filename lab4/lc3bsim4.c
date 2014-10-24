@@ -560,7 +560,10 @@ void initialize(char *ucode_filename, char *program_filename, int num_prog_files
   memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
   CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
 
+  CURRENT_LATCHES.USP = 0xFE00; /* Initial value of user stack pointer */
   CURRENT_LATCHES.PSR = 0x8000 + (CURRENT_LATCHES.N << 2) + (CURRENT_LATCHES.Z << 1) + (CURRENT_LATCHES.P); /* Initial value of processor status register: privilege level + cc */
+  CURRENT_LATCHES.E = 0;
+  CURRENT_LATCHES.I = 0;
 
   NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -626,27 +629,40 @@ void eval_micro_sequencer() {
    * Evaluate the address of the next state according to the 
    * micro sequencer logic. Latch the next microinstruction.
    */
-  int J, COND, and2, and1, and0, J5, J4, J3, J2, J1, J0;
-  if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
+  int J, COND, COND2, and4, and2, and1, and0, J5, J4, J3, J2, J1, J0;
+
+  if (CURRENT_LATCHES.E == 1) {
+	NEXT_LATCHES.STATE_NUMBER = Low16bits(0x31);
   } else {
-	J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
-	COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
-	and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
-	and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
-	and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
-	J5 = (J >> 5) & 0x1;
-	J4 = (J >> 4) & 0x1;
-	J3 = (J >> 3) & 0x1;
-	J2 = (J >> 2) & 0x1;
-	J1 = (J >> 1) & 0x1;
-	J0 = (J) & 0x1;
-	NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + (J4 << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
+	if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
+	} else {
+	  J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
+	  COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
+	  COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
+	  and4 = COND2 & CURRENT_LATCHES.I;
+	  and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
+	  and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
+	  and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
+	  J5 = (J >> 5) & 0x1;
+	  J4 = (J >> 4) & 0x1;
+	  J3 = (J >> 3) & 0x1;
+	  J2 = (J >> 2) & 0x1;
+	  J1 = (J >> 1) & 0x1;
+	  J0 = (J) & 0x1;
+	  NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + ((J4 | and4) << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
+	}
   }
+
   /* printf("READY:%d\n", CURRENT_LATCHES.READY); */
   memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[NEXT_LATCHES.STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
+
 }
 
+
+
+
+/* ?????????????????????Where should we copy I/E/PSR to the next state??? */
 
 int memory_cycle = 0;
 
@@ -684,7 +700,13 @@ void cycle_memory() {
 	  memory_cycle++;
 	}
   }
-  /* printf("memory_cycle:%d\n", memory_cycle); */
+
+  printf("memory_cycle:%d\n", memory_cycle);
+  
+  if (CYCLE_COUNT == 300) {
+	NEXT_LATCHES.I = 1;
+	NEXT_LATCHES.INTV = 0x01;
+  }
 
 }
 
@@ -695,6 +717,8 @@ enum BUS_DRIVER {
   GATE_ALU_DRIVER,
   GATE_SHF_DRIVER,
   GATE_MDR_DRIVER,
+  GATE_PSR_DRIVER,
+  GATE_VECTOR_DRIVER,
   EMPTY_DRIVER,
 } BUS_DRIVER;
 int bus_driver;
@@ -709,6 +733,8 @@ void eval_bus_drivers() {
    *		 Gate_ALU,
    *		 Gate_SHF,
    *		 Gate_MDR.
+   *		 Gate_PSR.
+   *		 Gate_VECTOR.
    */    
   if (GetGATE_MARMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	bus_driver = GATE_MARMUX_DRIVER;
@@ -720,6 +746,10 @@ void eval_bus_drivers() {
 	bus_driver = GATE_SHF_DRIVER;
   } else if (GetGATE_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	bus_driver = GATE_MDR_DRIVER;
+  } else if (GetGATE_PSR(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_PSR_DRIVER;
+  } else if (GetGATE_VECTOR(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_VECTOR_DRIVER;
   } else {
 	bus_driver = EMPTY_DRIVER;
   }
@@ -771,10 +801,15 @@ int AddrAdditor() {
   if (!GetADDR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	BASE = CURRENT_LATCHES.PC;
   } else {
-	if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  SR1 = GETREG(9);
+	/*Actually we don't need LD_R6 switch here......*/
+	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  SR1 = CURRENT_LATCHES.REGS[6];
 	} else {
-	  SR1 = GETREG(6); 
+	  if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		SR1 = GETREG(9);
+	  } else {
+		SR1 = GETREG(6); 
+	  }
 	}
 	BASE = SR1;
   }
@@ -800,10 +835,14 @@ void drive_bus() {
   } else if (bus_driver == GATE_PC_DRIVER) {
 	BUS = CURRENT_LATCHES.PC;
   } else if (bus_driver == GATE_ALU_DRIVER) {
-	if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  SR1 = GETREG(9);
+	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  SR1 = CURRENT_LATCHES.REGS[6];
 	} else {
-	  SR1 = GETREG(6); 
+	  if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		SR1 = GETREG(9);
+	  } else {
+		SR1 = GETREG(6); 
+	  }
 	}
 	if (((CURRENT_LATCHES.IR) >> 5) & 0x1) {
 	  SR2 = sext(GETNUM(5), 5);
@@ -830,10 +869,15 @@ void drive_bus() {
 		break;
 	}
   } else if (bus_driver == GATE_SHF_DRIVER) {
-	if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  SR1 = GETREG(9);
+	/*Actually we don't need LD_R6 switch here......*/
+	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  SR1 = CURRENT_LATCHES.REGS[6];
 	} else {
-	  SR1 = GETREG(6); 
+	  if (!GetSR1MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		SR1 = GETREG(9);
+	  } else {
+		SR1 = GETREG(6); 
+	  }
 	}
 	OP1 = GETNUM(4);
 	steer = ((CURRENT_LATCHES.IR) >> 4) & 0x3;
@@ -864,6 +908,18 @@ void drive_bus() {
 	  } else {
 		BUS = Low16bits(sext(0xFF & (CURRENT_LATCHES.MDR), 8));
 	  }
+	}
+  } else if (bus_driver == GATE_PSR_DRIVER) {
+	BUS = Low16bits(CURRENT_LATCHES.PSR);
+  } else if (bus_driver == GATE_VECTOR_DRIVER) {
+	if (CURRENT_LATCHES.INTV != 0) {
+	  BUS = Low16bits(0x0200 + CURRENT_LATCHES.INTV << 1);
+	} else if (CURRENT_LATCHES.EXCV != 0) {
+	  BUS = Low16bits(0x0200 + CURRENT_LATCHES.EXCV << 1);
+	} else {
+	  BUS = 0;
+	  /*???????????????????????????????????????????*/
+	  printf("There should be no output here.....impossible...\n");
 	}
   } else if (bus_driver == EMPTY_DRIVER) {
 	BUS = 0;
