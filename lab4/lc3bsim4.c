@@ -76,6 +76,20 @@ enum CS_BITS {
   DATA_SIZE,
   LSHF1,
   /* MODIFY: you have to add all your new control signals */
+  COND2,
+  LD_R6,
+  LD_E,
+  LD_SSP,
+  LD_USP,
+  LD_PSR,
+  Gate_PSR,
+  Gate_VECTOR,
+  PSRMUX1, PSRMUX0,
+  OPRMUX,
+  R6MUX,
+  CCMUX,
+  I_RESET,
+  E_RESET,
 
   CONTROL_STORE_BITS
 } CS_BITS;
@@ -112,6 +126,21 @@ int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
 /* MODIFY: you can add more Get functions for your new control signals */
+int GetCOND2(int *x)         { return(x[COND2]); }
+int GetLD_R6(int *x)         { return(x[LD_R6]); }
+int GetLD_E(int *x)          { return(x[LD_E]); }
+int GetLD_SSP(int *x)        { return(x[LD_SSP]); }
+int GetLD_USP(int *x)        { return(x[LD_USP]); }
+int GetLD_PSR(int *x)        { return(x[LD_PSR]); }
+int GetGate_PSR(int *x)      { return(x[Gate_PSR]); }
+int GetGate_VECTOR(int *x)   { return(x[Gate_VECTOR]); }
+int GetPSRMUX(int *x)        { return((x[PSRMUX1] << 1) + x[PSRMUX0]); }
+int GetOPRMUX(int *x)        { return(x[OPRMUX]); }
+int GetR6MUX(int *x)         { return((x[R6MUX1] << 1) + x[R6MUX0]); }
+int GetCCMUX(int *x)         { return(x[CCMUX]); }
+int GetI_RESET(int *x)       { return(x[I_RESET]); }
+int GetE_RESET(int *x)       { return(x[E_RESET]); }
+
 
 /***************************************************************/
 /* The control store rom.                                      */
@@ -169,7 +198,10 @@ typedef struct System_Latches_Struct{
   int EXCV; /* Exception vector register */
   int SSP; /* Initial value of system stack pointer */
   /* MODIFY: You may add system latches that are required by your implementation */
-
+  int USP; /* Temporarily store user stack pointer */
+  int PSR; /* Processor Status Register */
+  int E; /* Exception Detetion Flag, used in microsequencer */
+  int I; /* Interrupt Detection Flag, used in microsequencer */
 
 } System_Latches;
 
@@ -527,6 +559,8 @@ void initialize(char *ucode_filename, char *program_filename, int num_prog_files
   CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
   memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
   CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
+
+  CURRENT_LATCHES.PSR = 0x8000 + (CURRENT_LATCHES.N << 2) + (CURRENT_LATCHES.Z << 1) + (CURRENT_LATCHES.P); /* Initial value of processor status register: privilege level + cc */
 
   NEXT_LATCHES = CURRENT_LATCHES;
 
