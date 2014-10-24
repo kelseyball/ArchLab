@@ -949,6 +949,12 @@ void setcc(int res) {
   }
 }
 
+void setccPSR(int PSR) {
+  NEXT_LATCHES.N = (PSR >> 2) & 0x1;
+  NEXT_LATCHES.Z = (PSR >> 1) & 0x1;
+  NEXT_LATCHES.P = (PSR) & 0x1;
+}
+
 
 
 #define GETBIT(x) (((CURRENT_LATCHES.IR) >> (x)) & 0x1)
@@ -967,6 +973,32 @@ void latch_datapath_values() {
   if (GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
   } 
+
+  if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	/* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
+	int opcode;
+	if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS && 0xF000) >> 12) <= 0x2)) {
+	  NEXT_LATCHES.E = 1;
+	  NEXT_LATCHES.EXCV = 0x02;
+	  printf("Protection Exception!\n");
+	} else {
+	  if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
+		if (BUS & 0x1) {
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x03;
+		  printf("Unaligned Access Exception!\n");
+		}
+	  }
+	}
+
+	opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
+	if (opcode == 10 || opcode == 11) {
+	  NEXT_LATCHES.E = 1;
+	  NEXT_LATCHES.EXCV = 0x04;
+	  printf("Unknown Opcode Exception!\n");
+	}
+
+  }
 
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (!GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) { /* Read from BUS */
@@ -1000,16 +1032,43 @@ void latch_datapath_values() {
 	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)));
   }
 
+  /*?????????????????NEED LARGE MODIFICATIONS....*/
   if (GetLD_REG(CURRENT_LATCHES.MICROINSTRUCTION)) {
-    if (!GetDRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  NEXT_LATCHES.REGS[((CURRENT_LATCHES.IR) >> 9) & 0x7] = Low16bits(BUS);
+	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  switch(GetR6MUX(CURRENT_LATCHES.MICROINSTRUCTIONS)) {
+		case 0:
+		  if (!GetOPRMUX(CURRENT_LATCHES.MICROINSTRUCTIONS)) {
+			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] - 2;
+		  } else {
+			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] + 2;
+		  }
+		  break;
+		case 1:
+		  NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.SSP;
+		  break;
+		case 2:
+		  NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.USP;
+		  break;
+		default:
+		  /*???????????????????????*/
+		  printf("impossible.....\n");
+		  break;
+	  }
 	} else {
-	  NEXT_LATCHES.REGS[7] = Low16bits(BUS);
+	  if (!GetDRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		NEXT_LATCHES.REGS[((CURRENT_LATCHES.IR) >> 9) & 0x7] = Low16bits(BUS);
+	  } else {
+		NEXT_LATCHES.REGS[7] = Low16bits(BUS);
+	  }
 	}
   }
 
   if (GetLD_CC(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	setcc(BUS);
+	if (!GetCCMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  setcc(BUS);
+	} else {
+	  setccPSR(BUS);
+	}
   } 
 
 
@@ -1023,6 +1082,9 @@ void latch_datapath_values() {
 		break;
 	  case 2:
 		NEXT_LATCHES.PC = AddrAdditor();
+		break;
+	  case 3:
+		NEXT_LATCHES.PC = Low16bits(CURRENT_LATCHES.PC - 2);
 		break;
 	  default:
 		printf("impossible...");
@@ -1044,6 +1106,41 @@ void latch_datapath_values() {
 	  }
 	}
   }
+
+  if (GetLD_SSP(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.SSP = BUS;
+  } 
+
+  if (GetLD_USP(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.USP = BUS;
+  } 
+
+  if (GetLD_PSR(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	switch(GetPSRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  case 0:
+		NEXT_LATCHES.PSR = Low16bits(BUS);
+		break;
+	  case 1:
+		NEXT_LATCHES.PSR = Low16bits(CURRENT_LATCHES.PSR & 0x7FFF);
+		break;
+		/*????????????????????double check??????????????????????????*/
+	  case 2:
+		NEXT_LATCHES.PSR = (CURRENT_LATCHES.PSR & 0xFFF8) + (NEXT_LATCHES.N << 2) + (NEXT_LATCHES.Z << 1) + (NEXT_LATCHES.P);
+		break;
+	  default:
+		printf("impossible\n");
+		break;
+	}
+  }
+
+  if (GetI_RESET(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.I = 0;
+  } 
+
+  if (GetE_RESET(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.E = 0;
+  } 
+
 
 }
 
