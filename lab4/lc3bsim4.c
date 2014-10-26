@@ -333,6 +333,14 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
 /***************************************************************/
 void rdump(FILE * dumpsim_file) {                               
   int k; 
+  printf("USP           : 0x%0.4x\n", CURRENT_LATCHES.USP);
+  printf("SSP           : 0x%0.4x\n", CURRENT_LATCHES.SSP);
+  printf("PSR           : 0x%0.4x\n", CURRENT_LATCHES.PSR);
+  printf("INTV           : 0x%0.4x\n", CURRENT_LATCHES.INTV);
+  printf("EXCV           : 0x%0.4x\n", CURRENT_LATCHES.EXCV);
+  printf("I           : 0x%0.4x\n", CURRENT_LATCHES.I);
+  printf("E           : 0x%0.4x\n", CURRENT_LATCHES.E);
+ 
 
   printf("\nCurrent register/bus values :\n");
   printf("-------------------------------------\n");
@@ -640,7 +648,8 @@ void eval_micro_sequencer() {
 	  J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
 	  COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	  COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
-	  and4 = COND2 & CURRENT_LATCHES.I;
+	  and4 = COND2 & (CURRENT_LATCHES.I);
+	  if(and4) printf("Come into State 49!!\n");
 	  and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
 	  and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
 	  and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
@@ -703,7 +712,8 @@ void cycle_memory() {
 
   printf("memory_cycle:%d\n", memory_cycle);
   
-  if (CYCLE_COUNT == 300) {
+  if (CYCLE_COUNT == 3) {
+	printf("Interruption!!\n");
 	NEXT_LATCHES.I = 1;
 	NEXT_LATCHES.INTV = 0x01;
   }
@@ -913,9 +923,9 @@ void drive_bus() {
 	BUS = Low16bits(CURRENT_LATCHES.PSR);
   } else if (bus_driver == GATE_VECTOR_DRIVER) {
 	if (CURRENT_LATCHES.INTV != 0) {
-	  BUS = Low16bits(0x0200 + CURRENT_LATCHES.INTV << 1);
+	  BUS = Low16bits(0x0200 + (CURRENT_LATCHES.INTV << 1));
 	} else if (CURRENT_LATCHES.EXCV != 0) {
-	  BUS = Low16bits(0x0200 + CURRENT_LATCHES.EXCV << 1);
+	  BUS = Low16bits(0x0200 + (CURRENT_LATCHES.EXCV << 1));
 	} else {
 	  BUS = 0;
 	  /*???????????????????????????????????????????*/
@@ -1039,16 +1049,16 @@ void latch_datapath_values() {
 	  switch(GetR6MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 		case 0:
 		  if (!GetOPRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] - 2;
+			NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.REGS[6] - 2);
 		  } else {
-			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] + 2;
+			NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.REGS[6] + 2);
 		  }
 		  break;
 		case 1:
-		  NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.SSP;
+		  NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.SSP);
 		  break;
 		case 2:
-		  NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.USP;
+		  NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.USP);
 		  break;
 		default:
 		  /*???????????????????????*/
