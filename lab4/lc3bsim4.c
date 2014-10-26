@@ -82,11 +82,11 @@ enum CS_BITS {
   LD_SSP,
   LD_USP,
   LD_PSR,
-  Gate_PSR,
-  Gate_VECTOR,
+  GATE_PSR,
+  GATE_VECTOR,
   PSRMUX1, PSRMUX0,
   OPRMUX,
-  R6MUX,
+  R6MUX1, R6MUX0,
   CCMUX,
   I_RESET,
   E_RESET,
@@ -132,8 +132,8 @@ int GetLD_E(int *x)          { return(x[LD_E]); }
 int GetLD_SSP(int *x)        { return(x[LD_SSP]); }
 int GetLD_USP(int *x)        { return(x[LD_USP]); }
 int GetLD_PSR(int *x)        { return(x[LD_PSR]); }
-int GetGate_PSR(int *x)      { return(x[Gate_PSR]); }
-int GetGate_VECTOR(int *x)   { return(x[Gate_VECTOR]); }
+int GetGATE_PSR(int *x)      { return(x[GATE_PSR]); }
+int GetGATE_VECTOR(int *x)   { return(x[GATE_VECTOR]); }
 int GetPSRMUX(int *x)        { return((x[PSRMUX1] << 1) + x[PSRMUX0]); }
 int GetOPRMUX(int *x)        { return(x[OPRMUX]); }
 int GetR6MUX(int *x)         { return((x[R6MUX1] << 1) + x[R6MUX0]); }
@@ -972,32 +972,33 @@ void latch_datapath_values() {
    */
   if (GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
-  } 
-
-  if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	/* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
-	int opcode;
-	if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS && 0xF000) >> 12) <= 0x2)) {
-	  NEXT_LATCHES.E = 1;
-	  NEXT_LATCHES.EXCV = 0x02;
-	  printf("Protection Exception!\n");
-	} else {
-	  if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
-		if (BUS & 0x1) {
-		  NEXT_LATCHES.E = 1;
-		  NEXT_LATCHES.EXCV = 0x03;
-		  printf("Unaligned Access Exception!\n");
+	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  /* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
+	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
+		NEXT_LATCHES.E = 1;
+		NEXT_LATCHES.EXCV = 0x02;
+		printf("Protection Exception!\n");
+	  } else {
+		if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
+		  if (BUS & 0x1) {
+			NEXT_LATCHES.E = 1;
+			NEXT_LATCHES.EXCV = 0x03;
+			printf("Unaligned Access Exception!\n");
+		  }
 		}
 	  }
 	}
 
+  } 
+
+  if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	int opcode;
 	opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
 	if (opcode == 10 || opcode == 11) {
 	  NEXT_LATCHES.E = 1;
 	  NEXT_LATCHES.EXCV = 0x04;
 	  printf("Unknown Opcode Exception!\n");
 	}
-
   }
 
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -1035,9 +1036,9 @@ void latch_datapath_values() {
   /*?????????????????NEED LARGE MODIFICATIONS....*/
   if (GetLD_REG(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  switch(GetR6MUX(CURRENT_LATCHES.MICROINSTRUCTIONS)) {
+	  switch(GetR6MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 		case 0:
-		  if (!GetOPRMUX(CURRENT_LATCHES.MICROINSTRUCTIONS)) {
+		  if (!GetOPRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] - 2;
 		  } else {
 			NEXT_LATCHES.REGS[6] = CURRENT_LATCHES.REGS[6] + 2;
@@ -1056,6 +1057,7 @@ void latch_datapath_values() {
 	  }
 	} else {
 	  if (!GetDRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		printf("R%d\n", ((CURRENT_LATCHES.IR) >> 9) & 0x7);
 		NEXT_LATCHES.REGS[((CURRENT_LATCHES.IR) >> 9) & 0x7] = Low16bits(BUS);
 	  } else {
 		NEXT_LATCHES.REGS[7] = Low16bits(BUS);
