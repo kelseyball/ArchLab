@@ -922,7 +922,7 @@ void drive_bus() {
   } else if (bus_driver == GATE_PSR_DRIVER) {
 	BUS = Low16bits(CURRENT_LATCHES.PSR);
   } else if (bus_driver == GATE_VECTOR_DRIVER) {
-	if (CURRENT_LATCHES.INTV != 0) {
+	if (CURRENT_LATCHES.I != 0) {
 	  BUS = Low16bits(0x0200 + (CURRENT_LATCHES.INTV << 1));
 	} else if (CURRENT_LATCHES.EXCV != 0) {
 	  BUS = Low16bits(0x0200 + (CURRENT_LATCHES.EXCV << 1));
@@ -1001,16 +1001,6 @@ void latch_datapath_values() {
 
   } 
 
-  if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	int opcode;
-	opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
-	if (opcode == 10 || opcode == 11) {
-	  NEXT_LATCHES.E = 1;
-	  NEXT_LATCHES.EXCV = 0x04;
-	  printf("Unknown Opcode Exception!\n");
-	}
-  }
-
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (!GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) { /* Read from BUS */
 	  if (!GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) { /* BYTE */
@@ -1041,6 +1031,15 @@ void latch_datapath_values() {
 
   if (GetLD_BEN(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)));
+	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  int opcode;
+	  opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
+	  if (opcode == 10 || opcode == 11) {
+		NEXT_LATCHES.E = 1;
+		NEXT_LATCHES.EXCV = 0x04;
+		printf("Unknown Opcode Exception!\n");
+	  }
+	}
   }
 
   /*?????????????????NEED LARGE MODIFICATIONS....*/
