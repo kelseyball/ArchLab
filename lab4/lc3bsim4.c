@@ -712,7 +712,7 @@ void cycle_memory() {
 
   printf("memory_cycle:%d\n", memory_cycle);
   
-  if (CYCLE_COUNT == 3) {
+  if (CYCLE_COUNT == 300) {
 	printf("Interruption!!\n");
 	NEXT_LATCHES.I = 1;
 	NEXT_LATCHES.INTV = 0x01;
