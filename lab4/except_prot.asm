@@ -1,3 +1,3 @@
     .ORIG x1600
-    HALT
+    TRAP x25
     .END

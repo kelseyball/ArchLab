@@ -1,3 +1,8 @@
+/*
+    Name: Jianyu Huang
+    UTEID: jh57266
+*/
+
 /***************************************************************/
 /*                                                             */
 /*   LC-3b Simulator                                           */
@@ -90,6 +95,7 @@ enum CS_BITS {
   CCMUX,
   I_RESET,
   E_RESET,
+  /* Please refer to my readme file in Canvas for the meaning of these control signals */
 
   CONTROL_STORE_BITS
 } CS_BITS;
@@ -333,6 +339,7 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
 /***************************************************************/
 void rdump(FILE * dumpsim_file) {                               
   int k; 
+  /*
   printf("USP           : 0x%0.4x\n", CURRENT_LATCHES.USP);
   printf("SSP           : 0x%0.4x\n", CURRENT_LATCHES.SSP);
   printf("PSR           : 0x%0.4x\n", CURRENT_LATCHES.PSR);
@@ -340,7 +347,7 @@ void rdump(FILE * dumpsim_file) {
   printf("EXCV           : 0x%0.4x\n", CURRENT_LATCHES.EXCV);
   printf("I           : 0x%0.4x\n", CURRENT_LATCHES.I);
   printf("E           : 0x%0.4x\n", CURRENT_LATCHES.E);
- 
+  */
 
   printf("\nCurrent register/bus values :\n");
   printf("-------------------------------------\n");
@@ -639,6 +646,7 @@ void eval_micro_sequencer() {
    */
   int J, COND, COND2, and4, and2, and1, and0, J5, J4, J3, J2, J1, J0;
 
+  /* Add a control signal to the mux, so if E==1, the micro sequencer will always choose the next state as 49 */
   if (CURRENT_LATCHES.E == 1) {
 	NEXT_LATCHES.STATE_NUMBER = Low16bits(0x31);
   } else {
@@ -649,7 +657,7 @@ void eval_micro_sequencer() {
 	  COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 	  COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
 	  and4 = COND2 & (CURRENT_LATCHES.I);
-	  if(and4) printf("Come into State 49!!\n");
+	  /* if(and4) printf("Come into State 49!!\n"); */
 	  and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
 	  and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
 	  and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
@@ -669,10 +677,6 @@ void eval_micro_sequencer() {
 }
 
 
-
-
-/* ?????????????????????Where should we copy I/E/PSR to the next state??? */
-
 int memory_cycle = 0;
 
 void cycle_memory() {
@@ -684,15 +688,6 @@ void cycle_memory() {
    * cycle to prepare microsequencer for the fifth cycle.  
    */
   /* We need one flag to record whether it is the first time we have MIO_EN for the same state */
-  /*
-  if (no_memory_access) {
-	if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  no_memory_acccess = 0;
-	}
-
-  } else {
-  }
-  */
   /* ??????????????????????NEED TO DOUBLE CHECK HERE!!!! */
   if (!memory_cycle) {
 	if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -710,14 +705,13 @@ void cycle_memory() {
 	}
   }
 
-  printf("memory_cycle:%d\n", memory_cycle);
+  /* printf("memory_cycle:%d\n", memory_cycle); */
   
   if (CYCLE_COUNT == 300) {
-	printf("Interruption!!\n");
+	/* printf("Interruption!!\n"); */
 	NEXT_LATCHES.I = 1;
 	NEXT_LATCHES.INTV = 0x01;
   }
-
 }
 
 
@@ -738,7 +732,7 @@ void eval_bus_drivers() {
   /* 
    * Datapath routine emulating operations before driving the bus.
    * Evaluate the input of tristate drivers 
-   *             Gate_MARMUX,
+   *         Gate_MARMUX,
    *		 Gate_PC,
    *		 Gate_ALU,
    *		 Gate_SHF,
@@ -767,6 +761,7 @@ void eval_bus_drivers() {
 }
 
 
+/* This function is used for sign extending a number with digits bits */
 int sext(int num, int digits) {
   int sign = (num >> (digits - 1)) & 0x1;
   if (!sign) {
@@ -783,6 +778,7 @@ int sext(int num, int digits) {
 #define GETNUM(x) ((CURRENT_LATCHES.IR) & ((1 << (x)) - 1))
 
 
+/* Implement the logic for the MUX under MARMUX and PCMUX, with Base+Offset */
 int AddrAdditor() {
   int SR1, BASE, OFFSET;
   /* ???????????????DOUBLE check whether we should concat/cut off OFFSET into 16 bits???? */
@@ -929,16 +925,14 @@ void drive_bus() {
 	} else {
 	  BUS = 0;
 	  /*???????????????????????????????????????????*/
-	  printf("There should be no output here.....impossible...\n");
+	  /* printf("There should be no output here.....impossible...\n"); */
 	}
   } else if (bus_driver == EMPTY_DRIVER) {
 	BUS = 0;
   }
 }
 
-
-
-
+/* Set the condition number according the bus */
 void setcc(int res) {
   int sign;
   if (!res) {
@@ -959,6 +953,7 @@ void setcc(int res) {
   }
 }
 
+/* Set the condition number according to PSR */
 void setccPSR(int PSR) {
   NEXT_LATCHES.N = (PSR >> 2) & 0x1;
   NEXT_LATCHES.Z = (PSR >> 1) & 0x1;
@@ -980,6 +975,7 @@ void latch_datapath_values() {
    * require sourcing the bus; therefore, this routine has to come 
    * after drive_bus.
    */
+  /* LD MAR */
   if (GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -987,20 +983,20 @@ void latch_datapath_values() {
 	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
 		NEXT_LATCHES.E = 1;
 		NEXT_LATCHES.EXCV = 0x02;
-		printf("Protection Exception!\n");
+		/* printf("Protection Exception!\n"); */
 	  } else {
 		if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
 		  if (BUS & 0x1) {
 			NEXT_LATCHES.E = 1;
 			NEXT_LATCHES.EXCV = 0x03;
-			printf("Unaligned Access Exception!\n");
+			/* printf("Unaligned Access Exception!\n"); */
 		  }
 		}
 	  }
 	}
-
   } 
 
+  /* LD MDR */
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (!GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)) { /* Read from BUS */
 	  if (!GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) { /* BYTE */
@@ -1025,10 +1021,12 @@ void latch_datapath_values() {
 	}
   } 
 
+  /* LD IR */
   if (GetLD_IR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.IR = Low16bits(BUS);
   } 
 
+  /* LD BEN */
   if (GetLD_BEN(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.BEN = Low16bits((GETBIT(11) & (CURRENT_LATCHES.N)) || (GETBIT(10) & (CURRENT_LATCHES.Z)) || (GETBIT(9) & (CURRENT_LATCHES.P)));
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -1037,12 +1035,12 @@ void latch_datapath_values() {
 	  if (opcode == 10 || opcode == 11) {
 		NEXT_LATCHES.E = 1;
 		NEXT_LATCHES.EXCV = 0x04;
-		printf("Unknown Opcode Exception!\n");
+		/* printf("Unknown Opcode Exception!\n"); */
 	  }
 	}
   }
 
-  /*?????????????????NEED LARGE MODIFICATIONS....*/
+  /* LD REG */
   if (GetLD_REG(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (GetLD_R6(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  switch(GetR6MUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -1060,13 +1058,13 @@ void latch_datapath_values() {
 		  NEXT_LATCHES.REGS[6] = Low16bits(CURRENT_LATCHES.USP);
 		  break;
 		default:
-		  /*???????????????????????*/
+		  /*only 3 cases???????????????????????*/
 		  printf("impossible.....\n");
 		  break;
 	  }
 	} else {
 	  if (!GetDRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
-		printf("R%d\n", ((CURRENT_LATCHES.IR) >> 9) & 0x7);
+		/* printf("R%d\n", ((CURRENT_LATCHES.IR) >> 9) & 0x7); */
 		NEXT_LATCHES.REGS[((CURRENT_LATCHES.IR) >> 9) & 0x7] = Low16bits(BUS);
 	  } else {
 		NEXT_LATCHES.REGS[7] = Low16bits(BUS);
@@ -1074,6 +1072,7 @@ void latch_datapath_values() {
 	}
   }
 
+  /* LD CC */
   if (GetLD_CC(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (!GetCCMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  setcc(BUS);
@@ -1082,7 +1081,7 @@ void latch_datapath_values() {
 	}
   } 
 
-
+  /* LD PC */
   if (GetLD_PC(CURRENT_LATCHES.MICROINSTRUCTION)) {
     switch (GetPCMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  case 0:
@@ -1103,7 +1102,7 @@ void latch_datapath_values() {
 	}
   }
 
-
+  /* Memory Enable && Write*/
   if (GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION) && GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  MEMBYTE(CURRENT_LATCHES.MAR) = Low16bits(CURRENT_LATCHES.MDR & 0xFF);
@@ -1118,14 +1117,18 @@ void latch_datapath_values() {
 	}
   }
 
+  /* LD SSP */
   if (GetLD_SSP(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	/* printf("LD_SSP...\n"); */
 	NEXT_LATCHES.SSP = BUS;
   } 
 
+  /* LD USP */
   if (GetLD_USP(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.USP = BUS;
   } 
 
+  /* LD PSR */
   if (GetLD_PSR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	switch(GetPSRMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  case 0:
@@ -1144,10 +1147,12 @@ void latch_datapath_values() {
 	}
   }
 
+  /* RESET I */
   if (GetI_RESET(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.I = 0;
   } 
 
+  /* RESET E */
   if (GetE_RESET(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.E = 0;
   } 
