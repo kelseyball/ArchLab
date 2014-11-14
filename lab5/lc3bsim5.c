@@ -100,9 +100,10 @@ enum CS_BITS {
   V2P,
   LD_VA,
   LD_J,
-  LD_TEMP_J,
   GATE_PTBR,
   GATE_VA,
+  CK_PROT_PAGE,
+  UPDATE_PTE,
   /* Please refer to my readme file in Canvas for the meaning of these control signals */
 
  
@@ -156,12 +157,13 @@ int GetCCMUX(int *x)         { return(x[CCMUX]); }
 int GetI_RESET(int *x)       { return(x[I_RESET]); }
 int GetE_RESET(int *x)       { return(x[E_RESET]); }
 
-int GetV2P(int *x)         { return(x[V2P]); }
+int GetV2P(int *x)           { return(x[V2P]); }
 int GetLD_VA(int *x)         { return(x[LD_VA]); }
 int GetLD_J(int *x)          { return(x[LD_J]); }
-int GetLD_TEMP_J(int *x)     { return(x[LD_TEMP_J]); }
 int GetGATE_PTBR(int *x)     { return(x[GATE_PTBR]); }
 int GetGATE_VA(int *x)       { return(x[GATE_VA]); }
+int GetCK_PROT_PAGE(int *x)  { return(x[CK_PROT_PAGE]); }
+int GetUPDATE_PTE(int *x)    { return(x[UPDATE_PTE]); }
 
 
 /***************************************************************/
@@ -225,6 +227,7 @@ typedef struct System_Latches_Struct{
   int E; /* Exception Detetion Flag, used in microsequencer */
   int I; /* Interrupt Detection Flag, used in microsequencer */
 
+  int TEMP_J;
 
   /* For lab 5 */
   int PTBR; /* This is initialized when we load the page table */
@@ -705,15 +708,21 @@ void eval_micro_sequencer() {
   if (CURRENT_LATCHES.E == 1) {
 	NEXT_LATCHES.STATE_NUMBER = Low16bits(0x31);
   } else {
+
 	COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
 	and4 = COND2 & (CURRENT_LATCHES.I);
 	if (GetV2P(CURRENT_LATCHES.MICROINSTRUCTION) && !and4 ) {
 	  NEXT_LATCHES.STATE_NUMBER = Low16bits(0x36);
+	  NEXT_LATCHES.TEMP_J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
 	} else {
 	  if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
 		NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
 	  } else {
-		J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
+		if (!GetLD_J(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		  J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
+		} else {
+		  J = CURRENT_LATCHES.TEMP_J;
+		}
 		COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
 		/* if(and4) printf("Come into State 49!!\n"); */
 		and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
@@ -1040,10 +1049,6 @@ void setccPSR(int PSR) {
 #define MEMBYTE(x) MEMORY[(Low16bits(x)) >> 1][(Low16bits(x)) & 0x1]
 #define MEMWORD(x) (Low16bits(((MEMORY[(Low16bits(x)) >> 1][1]) << 8) + ((MEMORY[(Low16bits(x)) >> 1][0]) & 0xFF)))
 
-
-
-
-
 void latch_datapath_values() {
 
   /* 
@@ -1057,19 +1062,25 @@ void latch_datapath_values() {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  /* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
-	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
-		NEXT_LATCHES.E = 1;
-		NEXT_LATCHES.EXCV = 0x02;
-		printf("Protection Exception!\n");
-	  } else {
+//	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
+//		NEXT_LATCHES.E = 1;
+//		NEXT_LATCHES.EXCV = 0x02;
+//		printf("Protection Exception!\n");
+//	  } else {
 		if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
 		  if (BUS & 0x1) {
 			NEXT_LATCHES.E = 1;
 			NEXT_LATCHES.EXCV = 0x03;
 			printf("Unaligned Access Exception!\n");
 		  }
+		} else {
+		  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
+			if ()
+			  //CK_PROT_PAGE: can only be WORD, MDR == BUS
+		  }
 		}
-	  }
+//    }
+      
 	}
   } 
 
@@ -1081,7 +1092,6 @@ void latch_datapath_values() {
 		if (CURRENT_LATCHES.MAR & 0x1) {
 		  CURRENT_LATCHES.MDR = BUS && 0x00FF;
 		} else {
-
 		}
 		*/
 		/* State 24 , MDR <- SR[7:0] */
@@ -1094,6 +1104,21 @@ void latch_datapath_values() {
 		NEXT_LATCHES.MDR = MEMWORD(CURRENT_LATCHES.MAR);
 	  } else {
 		NEXT_LATCHES.MDR = CURRENT_LATCHES.MDR;
+	  }
+	}
+	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	  //impossible to have both protection and page fault: all pages in system space resident in the physical memory
+	  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	    if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!((BUS >> 3) & 0x1))) {
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x04;
+		  printf("Protection Exception!\n");
+		} 
+		if (!((BUS >> 2) & 0x1)) {
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x02;
+		  printf("Page Fault!\n");
+		}
 	  }
 	}
   } 
@@ -1111,8 +1136,8 @@ void latch_datapath_values() {
 	  opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
 	  if (opcode == 10 || opcode == 11) {
 		NEXT_LATCHES.E = 1;
-		NEXT_LATCHES.EXCV = 0x04;
-		/* printf("Unknown Opcode Exception!\n"); */
+		NEXT_LATCHES.EXCV = 0x05;
+		printf("Unknown Opcode Exception!\n");
 	  }
 	}
   }
@@ -1233,6 +1258,19 @@ void latch_datapath_values() {
   if (GetE_RESET(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.E = 0;
   } 
+
+  if (GetLD_VA(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	NEXT_LATCHES.VA = Low16bits(CURRENT_LATCHES.MAR);
+  }
+
+  if (GetUPDATE_PTE(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	int opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
+	NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x01);
+	/* If the pending access is a write, set the modified bit of the PTE*/
+	if (opcode == 3 || opcode == 7) {
+	  NEXT_LATCHES.MDR = Low16bits(CURRENT_LACTHES.MDR | 0x02);
+	}
+  }
 
 
 }
