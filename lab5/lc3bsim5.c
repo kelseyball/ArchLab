@@ -378,6 +378,9 @@ void rdump(FILE * dumpsim_file) {
   printf("EXCV           : 0x%0.4x\n", CURRENT_LATCHES.EXCV);
   printf("I           : 0x%0.4x\n", CURRENT_LATCHES.I);
   printf("E           : 0x%0.4x\n", CURRENT_LATCHES.E);
+  printf("TEMP_J         : 0x%0.4x\n", CURRENT_LATCHES.TEMP_J);
+  printf("PTBR         : 0x%0.4x\n", CURRENT_LATCHES.PTBR);
+  printf("VA           : 0x%0.4x\n", CURRENT_LATCHES.VA);
 
 
 
@@ -1000,14 +1003,14 @@ void drive_bus() {
 	  /* printf("There should be no output here.....impossible...\n"); */
 	}
   } else if (bus_driver == GATE_PTBR_DRIVER) {
-	//0b1111111
+	/*0b1111111*/
 	BUS = Low16bits(CURRENT_LATCHES.PTBR + (((CURRENT_LATCHES.VA >> 9) & 0x7F) << 1));
   } else if (bus_driver == GATE_VA_DRIVER) {
 	int mar = 0, pfn;
 	pfn = ((CURRENT_LATCHES.MDR >> 9) & 0x1F);
 	mar |= (pfn << 9);
 	mar |= (CURRENT_LATCHES.VA & 0x1FF);
-	//CURRENT_LATCHES.MAR = mar;
+	/*CURRENT_LATCHES.MAR = mar;*/
 	BUS = Low16bits(mar);
   } else if (bus_driver == EMPTY_DRIVER) {
 	BUS = 0;
@@ -1062,24 +1065,26 @@ void latch_datapath_values() {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  /* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
-//	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
-//		NEXT_LATCHES.E = 1;
-//		NEXT_LATCHES.EXCV = 0x02;
-//		printf("Protection Exception!\n");
-//	  } else {
+	  /*
+	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
+		NEXT_LATCHES.E = 1;
+		NEXT_LATCHES.EXCV = 0x02;
+		printf("Protection Exception!\n");
+	  } else { */
 		if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
 		  if (BUS & 0x1) {
 			NEXT_LATCHES.E = 1;
 			NEXT_LATCHES.EXCV = 0x03;
 			printf("Unaligned Access Exception!\n");
 		  }
-		} else {
+		} 
+		/*else {
 		  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
 			if ()
-			  //CK_PROT_PAGE: can only be WORD, MDR == BUS
+			  CK_PROT_PAGE: can only be WORD, MDR == BUS
 		  }
-		}
-//    }
+		}*/
+/*    } */
       
 	}
   } 
@@ -1107,7 +1112,7 @@ void latch_datapath_values() {
 	  }
 	}
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  //impossible to have both protection and page fault: all pages in system space resident in the physical memory
+	  /*impossible to have both protection and page fault: all pages in system space resident in the physical memory*/
 	  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	    if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!((BUS >> 3) & 0x1))) {
 		  NEXT_LATCHES.E = 1;
@@ -1268,7 +1273,7 @@ void latch_datapath_values() {
 	NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x01);
 	/* If the pending access is a write, set the modified bit of the PTE*/
 	if (opcode == 3 || opcode == 7) {
-	  NEXT_LATCHES.MDR = Low16bits(CURRENT_LACTHES.MDR | 0x02);
+	  NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x02);
 	}
   }
 

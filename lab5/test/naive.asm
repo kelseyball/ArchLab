@@ -1,27 +1,4 @@
 .ORIG x3000
-
-;XOR R0, R0, R0
-;ADD R0, R0, #1
-;LOOP ADD R0, R0, #-1
-;     BRzp LOOP
-
-;.FILL   xBF00
-        LEA R1, SUMLOC
-        LDW R2, R1, #0
-        LDB R3, R2, #0
-;        STW R1, R2, #0
-;        HALT
-
-
+AND R0, R0, #0
 HALT
-;SUMLOC  .FILL x3023
-SUMLOC  .FILL x0000
-
-;.FILL   xBF00
-;AND R0, R0, #0
-;LEA R0, ADDR
-;LDW R1, R0, #0
-;STW R2, R1, #0
-;HALT
-;ADDR .FILL xC017
 .END
