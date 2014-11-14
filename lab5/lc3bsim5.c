@@ -96,6 +96,13 @@ enum CS_BITS {
   CCMUX,
   I_RESET,
   E_RESET,
+
+  V2P,
+  LD_VA,
+  LD_J,
+  LD_TEMP_J,
+  GATE_PTBR,
+  GATE_VA,
   /* Please refer to my readme file in Canvas for the meaning of these control signals */
 
  
@@ -149,6 +156,12 @@ int GetCCMUX(int *x)         { return(x[CCMUX]); }
 int GetI_RESET(int *x)       { return(x[I_RESET]); }
 int GetE_RESET(int *x)       { return(x[E_RESET]); }
 
+int GetV2P(int *x)         { return(x[V2P]); }
+int GetLD_VA(int *x)         { return(x[LD_VA]); }
+int GetLD_J(int *x)          { return(x[LD_J]); }
+int GetLD_TEMP_J(int *x)     { return(x[LD_TEMP_J]); }
+int GetGATE_PTBR(int *x)     { return(x[GATE_PTBR]); }
+int GetGATE_VA(int *x)       { return(x[GATE_VA]); }
 
 
 /***************************************************************/
@@ -625,8 +638,6 @@ void initialize(char *ucode_filename, char *pagetable_filename, char *program_fi
   CURRENT_LATCHES.E = 0;
   CURRENT_LATCHES.I = 0;
 
-
-
   NEXT_LATCHES = CURRENT_LATCHES;
 
   RUN_BIT = TRUE;
@@ -694,24 +705,28 @@ void eval_micro_sequencer() {
   if (CURRENT_LATCHES.E == 1) {
 	NEXT_LATCHES.STATE_NUMBER = Low16bits(0x31);
   } else {
-	if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
+	COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
+	and4 = COND2 & (CURRENT_LATCHES.I);
+	if (GetV2P(CURRENT_LATCHES.MICROINSTRUCTION) && !and4 ) {
+	  NEXT_LATCHES.STATE_NUMBER = Low16bits(0x36);
 	} else {
-	  J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
-	  COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
-	  COND2 = GetCOND2(CURRENT_LATCHES.MICROINSTRUCTION);
-	  and4 = COND2 & (CURRENT_LATCHES.I);
-	  /* if(and4) printf("Come into State 49!!\n"); */
-	  and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
-	  and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
-	  and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
-	  J5 = (J >> 5) & 0x1;
-	  J4 = (J >> 4) & 0x1;
-	  J3 = (J >> 3) & 0x1;
-	  J2 = (J >> 2) & 0x1;
-	  J1 = (J >> 1) & 0x1;
-	  J0 = (J) & 0x1;
-	  NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + ((J4 | and4) << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
+	  if (GetIRD(CURRENT_LATCHES.MICROINSTRUCTION)) {
+		NEXT_LATCHES.STATE_NUMBER = ((CURRENT_LATCHES.IR) >> 12) & 0xF;
+	  } else {
+		J = GetJ(CURRENT_LATCHES.MICROINSTRUCTION);
+		COND = GetCOND(CURRENT_LATCHES.MICROINSTRUCTION);
+		/* if(and4) printf("Come into State 49!!\n"); */
+		and2 = ((COND >> 1) & 0x1) & !(COND & 0x1) & CURRENT_LATCHES.BEN;
+		and1 = !((COND >> 1) & 0x1) & (COND & 0x1) & CURRENT_LATCHES.READY;
+		and0 = ((COND >> 1) & 0x1) & (COND & 0x1) & ((CURRENT_LATCHES.IR >> 11) & 0x1);
+		J5 = (J >> 5) & 0x1;
+		J4 = (J >> 4) & 0x1;
+		J3 = (J >> 3) & 0x1;
+		J2 = (J >> 2) & 0x1;
+		J1 = (J >> 1) & 0x1;
+		J0 = (J) & 0x1;
+		NEXT_LATCHES.STATE_NUMBER = (J5 << 5) + ((J4 | and4) << 4) + (J3 << 3) + ((J2 | and2) << 2) + ((J1 | and1) << 1) + (J0 | and0);
+	  }
 	}
   }
 
@@ -1037,7 +1052,7 @@ void latch_datapath_values() {
 		  if (BUS & 0x1) {
 			NEXT_LATCHES.E = 1;
 			NEXT_LATCHES.EXCV = 0x03;
-			/* printf("Unaligned Access Exception!\n"); */
+			printf("Unaligned Access Exception!\n");
 		  }
 		}
 	  }
