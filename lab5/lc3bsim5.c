@@ -780,6 +780,8 @@ enum BUS_DRIVER {
   GATE_MDR_DRIVER,
   GATE_PSR_DRIVER,
   GATE_VECTOR_DRIVER,
+  GATE_PTBR_DRIVER,
+  GATE_VA_DRIVER,
   EMPTY_DRIVER,
 } BUS_DRIVER;
 int bus_driver;
@@ -789,13 +791,15 @@ void eval_bus_drivers() {
   /* 
    * Datapath routine emulating operations before driving the bus.
    * Evaluate the input of tristate drivers 
-   *             Gate_MARMUX,
+   *         Gate_MARMUX,
    *		 Gate_PC,
    *		 Gate_ALU,
    *		 Gate_SHF,
-   *		 Gate_MDR.
-   *		 Gate_PSR.
-   *		 Gate_VECTOR.
+   *		 Gate_MDR,
+   *		 Gate_PSR,
+   *		 Gate_VECTOR,
+   *		 Gate_PTBR,
+   *		 Gate_VA,
    */    
   if (GetGATE_MARMUX(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	bus_driver = GATE_MARMUX_DRIVER;
@@ -811,6 +815,10 @@ void eval_bus_drivers() {
 	bus_driver = GATE_PSR_DRIVER;
   } else if (GetGATE_VECTOR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	bus_driver = GATE_VECTOR_DRIVER;
+  } else if (GetGATE_PTBR(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_PTBR_DRIVER;
+  } else if (GetGATE_VA(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	bus_driver = GATE_VA_DRIVER;
   } else {
 	bus_driver = EMPTY_DRIVER;
   }
@@ -877,10 +885,6 @@ int AddrAdditor() {
   }
   return Low16bits(BASE + OFFSET);
 }
-
-
-
-
 
 
 void drive_bus() {
@@ -986,6 +990,16 @@ void drive_bus() {
 	  /*???????????????????????????????????????????*/
 	  /* printf("There should be no output here.....impossible...\n"); */
 	}
+  } else if (bus_driver == GATE_PTBR_DRIVER) {
+	//0b1111111
+	BUS = Low16bits(CURRENT_LATCHES.PTBR + (((CURRENT_LATCHES.VA >> 9) & 0x7F) << 1));
+  } else if (bus_driver == GATE_VA_DRIVER) {
+	int mar = 0, pfn;
+	pfn = ((CURRENT_LATCHES.MDR >> 9) & 0x1F);
+	mar |= (pfn << 9);
+	mar |= (CURRENT_LATCHES.VA & 0x1FF);
+	//CURRENT_LATCHES.MAR = mar;
+	BUS = Low16bits(mar);
   } else if (bus_driver == EMPTY_DRIVER) {
 	BUS = 0;
   }
