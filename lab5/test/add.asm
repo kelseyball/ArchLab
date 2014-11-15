@@ -2,11 +2,11 @@
         LEA R0, USPTR
         LDW R6, R0, #0
 
-        XOR R0, R0, R0
-        ADD R0, R0, #1
-        LEA R1, MOVLOC
-        LDW R1, R1, #0
-        STB R0, R1, #0
+        ;XOR R0, R0, R0
+        ;ADD R0, R0, #1
+        ;LEA R1, MOVLOC
+        ;LDW R1, R1, #0
+        ;STB R0, R1, #0
 
         XOR R0, R0, R0
 ;the 5-bit immediate number can only be [-16,15]
@@ -33,7 +33,7 @@ LOOP    LDB R3, R2, #0
         HALT
 
 USPTR   .FILL xFE00
-MOVLOC  .FILL x4000
+;MOVLOC  .FILL x4000
 ADDLOC  .FILL xC000
 SUMLOC  .FILL xC014
 ;SUMLOC  .FILL xC017

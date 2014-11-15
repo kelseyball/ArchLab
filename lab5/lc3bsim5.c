@@ -774,7 +774,7 @@ void cycle_memory() {
 	}
   }
 
-  printf("memory_cycle:%d\n", memory_cycle);
+  printf("memory_cycle:%d\tIR:0x%0.4x\tState:%d\tCycle:%d\n", memory_cycle, CURRENT_LATCHES.IR, CURRENT_LATCHES.STATE_NUMBER, CYCLE_COUNT);
   
   if (CYCLE_COUNT == 300) {
 	printf("Interruption!!\n");
@@ -1065,29 +1065,35 @@ void latch_datapath_values() {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  /* HERE NEXT_LATCHES.MAR = Low16bits(BUS); */
-	  /*
-	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (((BUS >> 12) & 0xF) <= 0x2)) {
-		NEXT_LATCHES.E = 1;
-		NEXT_LATCHES.EXCV = 0x02;
-		printf("Protection Exception!\n");
-	  } else { */
-		if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
-		  if (BUS & 0x1) {
-			NEXT_LATCHES.E = 1;
-			NEXT_LATCHES.EXCV = 0x03;
-			printf("Unaligned Access Exception!\n");
-		  }
-		} 
-		/*else {
-		  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
-			if ()
-			  CK_PROT_PAGE: can only be WORD, MDR == BUS
-		  }
-		}*/
-/*    } */
-      
+	  if ((CURRENT_LATCHES.STATE_NUMBER != 2) && (CURRENT_LATCHES.STATE_NUMBER != 3)) {
+		if (BUS & 0x1) {
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x03;
+		  printf("Unaligned Access Exception!\n");
+		}
+	  } else {
+
+	  }
 	}
+
   } 
+
+
+  /*impossible to have both protection and page fault: all pages in system space resident in the physical memory*/
+  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION) && GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
+	printf("Come to check prot and page fault!\n");
+	if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!(((CURRENT_LATCHES.MDR) >> 3) & 0x1))) {
+	  NEXT_LATCHES.E = 1;
+	  NEXT_LATCHES.EXCV = 0x04;
+	  printf("Protection Exception!\n");
+	} 
+	if (!(((CURRENT_LATCHES.MDR) >> 2) & 0x1)) {
+
+	  NEXT_LATCHES.E = 1;
+	  NEXT_LATCHES.EXCV = 0x02;
+	  printf("Page Fault!\n");
+	}
+  }
 
   /* LD MDR */
   if (GetLD_MDR(CURRENT_LATCHES.MICROINSTRUCTION)) {
@@ -1111,21 +1117,7 @@ void latch_datapath_values() {
 		NEXT_LATCHES.MDR = CURRENT_LATCHES.MDR;
 	  }
 	}
-	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	  /*impossible to have both protection and page fault: all pages in system space resident in the physical memory*/
-	  if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	    if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!((BUS >> 3) & 0x1))) {
-		  NEXT_LATCHES.E = 1;
-		  NEXT_LATCHES.EXCV = 0x04;
-		  printf("Protection Exception!\n");
-		} 
-		if (!((BUS >> 2) & 0x1)) {
-		  NEXT_LATCHES.E = 1;
-		  NEXT_LATCHES.EXCV = 0x02;
-		  printf("Page Fault!\n");
-		}
-	  }
-	}
+
   } 
 
   /* LD IR */
