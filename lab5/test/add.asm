@@ -30,6 +30,7 @@ LOOP    LDB R3, R2, #0
         LEA R2, SUMLOC
         LDW R2, R2, #0
         STW R1, R2, #0
+        JMP R1
         HALT
 
 USPTR   .FILL xFE00

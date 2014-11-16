@@ -774,7 +774,7 @@ void cycle_memory() {
 	}
   }
 
-  printf("memory_cycle:%d\tIR:0x%0.4x\tState:%d\tCycle:%d\n", memory_cycle, CURRENT_LATCHES.IR, CURRENT_LATCHES.STATE_NUMBER, CYCLE_COUNT);
+  printf("memory_cycle:%d\tIR:0x%0.4x\tState:%d\tCycle:%d\tPC:0x%0.4x\n", memory_cycle, CURRENT_LATCHES.IR, CURRENT_LATCHES.STATE_NUMBER, CYCLE_COUNT, CURRENT_LATCHES.PC);
   
   if (CYCLE_COUNT == 300) {
 	printf("Interruption!!\n");
@@ -1263,9 +1263,9 @@ void latch_datapath_values() {
   if (GetUPDATE_PTE(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	int opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
 	NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x01);
-	/* If the pending access is a write, set the modified bit of the PTE*/
-	if (opcode == 3 || opcode == 7) {
-	  NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x02);
+	/* If the pending access is a write, set the modified bit of the PTE (also reference bit)*/
+	if ((opcode == 3 || opcode == 7) && CURRENT_LATCHES.TEMP_J != 33) {
+	  NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x03);
 	}
   }
 
