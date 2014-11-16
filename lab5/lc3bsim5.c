@@ -371,6 +371,7 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
 void rdump(FILE * dumpsim_file) {                               
   int k; 
 
+  /*
   printf("USP           : 0x%0.4x\n", CURRENT_LATCHES.USP);
   printf("SSP           : 0x%0.4x\n", CURRENT_LATCHES.SSP);
   printf("PSR           : 0x%0.4x\n", CURRENT_LATCHES.PSR);
@@ -381,8 +382,7 @@ void rdump(FILE * dumpsim_file) {
   printf("TEMP_J         : 0x%0.4x\n", CURRENT_LATCHES.TEMP_J);
   printf("PTBR         : 0x%0.4x\n", CURRENT_LATCHES.PTBR);
   printf("VA           : 0x%0.4x\n", CURRENT_LATCHES.VA);
-
-
+  */
 
   printf("\nCurrent register/bus values :\n");
   printf("-------------------------------------\n");
@@ -774,10 +774,10 @@ void cycle_memory() {
 	}
   }
 
-  printf("memory_cycle:%d\tIR:0x%0.4x\tState:%d\tCycle:%d\tPC:0x%0.4x\n", memory_cycle, CURRENT_LATCHES.IR, CURRENT_LATCHES.STATE_NUMBER, CYCLE_COUNT, CURRENT_LATCHES.PC);
+  /* printf("memory_cycle:%d\tIR:0x%0.4x\tState:%d\tCycle:%d\tPC:0x%0.4x\n", memory_cycle, CURRENT_LATCHES.IR, CURRENT_LATCHES.STATE_NUMBER, CYCLE_COUNT, CURRENT_LATCHES.PC); */
   
   if (CYCLE_COUNT == 300) {
-	printf("Interruption!!\n");
+	/* printf("Interruption!!\n"); */
 	NEXT_LATCHES.I = 1;
 	NEXT_LATCHES.INTV = 0x01;
   }
@@ -1060,6 +1060,7 @@ void latch_datapath_values() {
    * require sourcing the bus; therefore, this routine has to come 
    * after drive_bus.
    */       
+  int has_exception = 0;
   /* LD MAR */
   if (GetLD_MAR(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.MAR = Low16bits(BUS);
@@ -1069,7 +1070,8 @@ void latch_datapath_values() {
 		if (BUS & 0x1) {
 		  NEXT_LATCHES.E = 1;
 		  NEXT_LATCHES.EXCV = 0x03;
-		  printf("Unaligned Access Exception!\n");
+		  has_exception = 1;
+		  /* printf("Unaligned Access Exception!\n"); */
 		}
 	  } else {
 
@@ -1081,17 +1083,22 @@ void latch_datapath_values() {
 
   /*impossible to have both protection and page fault: all pages in system space resident in the physical memory*/
   if (GetCK_PROT_PAGE(CURRENT_LATCHES.MICROINSTRUCTION) && GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
-	printf("Come to check prot and page fault!\n");
-	if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!(((CURRENT_LATCHES.MDR) >> 3) & 0x1))) {
-	  NEXT_LATCHES.E = 1;
-	  NEXT_LATCHES.EXCV = 0x04;
-	  printf("Protection Exception!\n");
-	} 
-	if (!(((CURRENT_LATCHES.MDR) >> 2) & 0x1)) {
+	/* printf("Come to check prot and page fault!\n"); */
+	if (!has_exception) {
+	  if (((CURRENT_LATCHES.PSR >> 15) & 0x1) && (!(((CURRENT_LATCHES.MDR) >> 3) & 0x1))) {
+		NEXT_LATCHES.E = 1;
+		NEXT_LATCHES.EXCV = 0x04;
+		/* printf("Protection Exception!\n"); */
+		has_exception = 1;
+	  } else { 
+		if (!(((CURRENT_LATCHES.MDR) >> 2) & 0x1)) {
 
-	  NEXT_LATCHES.E = 1;
-	  NEXT_LATCHES.EXCV = 0x02;
-	  printf("Page Fault!\n");
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x02;
+		  /* printf("Page Fault!\n"); */
+		  has_exception = 1;
+		}
+	  }
 	}
   }
 
@@ -1131,10 +1138,13 @@ void latch_datapath_values() {
 	if (GetLD_E(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	  int opcode;
 	  opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
-	  if (opcode == 10 || opcode == 11) {
-		NEXT_LATCHES.E = 1;
-		NEXT_LATCHES.EXCV = 0x05;
-		printf("Unknown Opcode Exception!\n");
+	  if (!has_exception) {
+		if (opcode == 10 || opcode == 11) {
+		  NEXT_LATCHES.E = 1;
+		  NEXT_LATCHES.EXCV = 0x05;
+		  /* printf("Unknown Opcode Exception!\n"); */
+		  has_exception = 1;
+		}
 	  }
 	}
   }
@@ -1256,10 +1266,12 @@ void latch_datapath_values() {
 	NEXT_LATCHES.E = 0;
   } 
 
+  /* LD_VA */
   if (GetLD_VA(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	NEXT_LATCHES.VA = Low16bits(CURRENT_LATCHES.MAR);
   }
 
+  /* UPDATE_PTE */
   if (GetUPDATE_PTE(CURRENT_LATCHES.MICROINSTRUCTION)) {
 	int opcode = (CURRENT_LATCHES.IR >> 12) & 0xF;
 	NEXT_LATCHES.MDR = Low16bits(CURRENT_LATCHES.MDR | 0x01);
