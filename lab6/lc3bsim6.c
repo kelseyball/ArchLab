@@ -363,6 +363,7 @@ void mdump(FILE * dumpsim_file, int start, int stop) {
     for (address = (start >> 1); address <= (stop >> 1); address++)
 	fprintf(dumpsim_file, " 0x%04x (%d) : 0x%02x%02x\n", address << 1, address << 1, MEMORY[address][1], MEMORY[address][0]);
     fprintf(dumpsim_file, "\n");
+    fflush(dumpsim_file);
 }
 
 /***************************************************************/
@@ -396,6 +397,7 @@ void rdump(FILE * dumpsim_file) {
     for (k = 0; k < LC3b_REGS; k++)
 	fprintf(dumpsim_file, "%d: 0x%04x\n", k, (REGS[k] & 0xFFFF));
     fprintf(dumpsim_file, "\n");
+    fflush(dumpsim_file);
 }
 
 /***************************************************************/
@@ -552,6 +554,7 @@ void idump(FILE * dumpsim_file) {
     fprintf(dumpsim_file,"SR_V            :  %d\n", PS.SR_V);
     
     fprintf(dumpsim_file,"\n");
+    fflush(dumpsim_file);
     
     
 }
