@@ -964,9 +964,9 @@ void MEM_stage() {
   if (!PS.MEM_V) {
 	mem_pcmux = 0;
   } else {
-	if (Get_TRAP_OP(PS.MEM_CS)) {
+	if (Get_TRAP_OP(PS.MEM_CS)) { /* this bit is set if the instruction is a TRAP */
 	  mem_pcmux = 2;
-	} else if (Get_UNCOND_OP(PS.MEM_CS)) {
+	} else if (Get_UNCOND_OP(PS.MEM_CS)) { /* this bit is set if the instruciton is a JSR/JSRR or a JMP */
 	  mem_pcmux = 1;
 	} else if (Get_BR_OP(PS.MEM_CS)) {
 	  if ((GETBIT(PS.MEM_IR, 11) && GETBIT(PS.MEM_CC, 2)) || (GETBIT(PS.MEM_IR, 10) && GETBIT(PS.MEM_CC, 2)) || (GETBIT(PS.MEM_IR, 9) && GETBIT(PS.MEM_CC, 0))) {
@@ -976,8 +976,10 @@ void MEM_stage() {
 	  mem_pcmux = 0;
 	}
   }
+
   /*MEM.DRID*/
   mem_drid = PS.MEM_DRID;
+
   /*Dependency Check Logic*/
   v_mem_br_stall = (PS.MEM_V) && (Get_MEM_BR_STALL(PS.MEM_CS));
   v_mem_ld_cc = (PS.MEM_V) && (Get_MEM_LD_CC(PS.MEM_CS));
@@ -1240,7 +1242,8 @@ void DE_stage() {
 
   /* SR2.IDMUX */
   /*?????????????????????????????????????????IR[13] ========1?????????????????????????????*/
-  //sr2_idmux = (((PS.DE_IR >> 12) & 0xF) == 3) && (((PS.DE_IR >> 12) & 0xF) == 7);
+  /*sr2_idmux = (((PS.DE_IR >> 12) & 0xF) == 3) && (((PS.DE_IR >> 12) & 0xF) == 7); */
+  /* DE.IR[13] is used to select between DE.IR[11:9] or DE.IR[2:0] */
   sr2_idmux = (PS.DE_IR >> 13) & 0x1;
   if (!sr2_idmux) {
 	sr2_id = (PS.DE_IR >> 9) & 0x7;
@@ -1257,6 +1260,7 @@ void DE_stage() {
   }
 
   /* V.DE.BR.STALL */
+  /* In the DE stage, if DE.V is 1 and BR.STALL is 1, then the DE.BR.STALL signal should be asserted */
   v_de_br_stall = PS.DE_V & Get_DE_BR_STALL(CONTROL_STORE[CONTROL_STORE_ADDRESS]);
 
 
@@ -1270,7 +1274,7 @@ void DE_stage() {
   } else if (Get_DE_BR_OP(CONTROL_STORE[CONTROL_STORE_ADDRESS])) {
 	dep_stall = v_sr_ld_cc || v_mem_ld_cc || v_agex_ld_cc;
   } else {
-	dep_stall = (sr1_needed && ((v_sr_ld_reg && sr_reg_id == sr1_id) || (v_mem_ld_reg && mem_reg_id == sr1_id) || (v_agex_ld_reg && agex_reg_id == sr1_id))) || (sr2_needed && ((v_sr_ld_reg && sr_reg_id == sr2_id) || (v_mem_ld_reg && mem_reg_id == sr2_id) || (v_agex_ld_reg && agex_reg_id == sr2_id)));
+	dep_stall = (sr1_needed && ((v_sr_ld_reg && sr_reg_id == sr1_id) || (v_mem_ld_reg && mem_drid == sr1_id) || (v_agex_ld_reg && agex_drid == sr1_id))) || (sr2_needed && ((v_sr_ld_reg && sr_reg_id == sr2_id) || (v_mem_ld_reg && mem_drid == sr2_id) || (v_agex_ld_reg && agex_drid == sr2_id)));
   }
   
 
@@ -1288,6 +1292,7 @@ void DE_stage() {
 
 	/* inside !mem_stall, so if mem_stall==1, then NEW_PS.AGEX_V = PS.AGEX_V*/
 	/* NEED TO CHECK.......v_agex_br_stall, v_mem_br_stall............???????????????????*/
+	/* If DEP.STALL is asserted, the state of the DE latches should not be changed and a bubble needs to be inserted into the AGEX stage, which is accomplished by settting AGEX.V to 0 */
 	if (!PS.DE_V || dep_stall || v_agex_br_stall || v_mem_br_stall) {
 	  NEW_PS.AGEX_V = 0;
 	} else {
