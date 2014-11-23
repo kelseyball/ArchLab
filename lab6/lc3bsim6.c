@@ -1230,7 +1230,7 @@ void DE_stage() {
 		  LD.AGEX signal */
 
   /* your code for DE stage goes here */
-  int sr1_id, sr2_id, sr2_idmux, drmux_out;
+  int sr1_id, sr2_id, sr2_idmux, drmux_out, sr1_needed, sr2_needed;
   /* SR1 ID */
   sr1_id = (PS.DR_IR >> 6) & 0x7;
 
@@ -1239,7 +1239,8 @@ void DE_stage() {
 
   /* SR2.IDMUX */
   /*?????????????????????????????????????????IR[13] ========1?????????????????????????????*/
-  sr2_idmux = (((PS.DE_IR >> 12) & 0xF) == 3) && (((PS.DE_IR >> 12) & 0xF) == 7);
+  //sr2_idmux = (((PS.DE_IR >> 12) & 0xF) == 3) && (((PS.DE_IR >> 12) & 0xF) == 7);
+  sr2_idmux = (PS.DE_IR >> 13) & 0x1;
   if (!sr2_idmux) {
 	sr2_id = (PS.DE_IR >> 9) & 0x7;
   } else {
@@ -1259,8 +1260,17 @@ void DE_stage() {
 
 
   /*Dependency Check Logic */
+  /*????????????????????????????????????????????????????????????*/
+  sr1_needed = Get_SR1_NEEDED(CONTROL_STORE[CONTROL_STORE_ADDRESS]);
+  sr2_needed = Get_SR2_NEEDED(CONTROL_STORE[CONTROL_STORE_ADDRESS]);
 
-
+  if (!PS.DE_V) {
+	dep_stall = 0;
+  } else if (Get_DE_BR_OP(CONTROL_STORE[CONTROL_STORE_ADDRESS])) {
+	dep_stall = v_sr_ld_cc || v_mem_ld_cc || v_agex_ld_cc;
+  } else {
+	dep_stall = (sr1_needed && ((v_sr_ld_reg && sr_reg_id == sr1_id) || (v_mem_ld_reg && mem_reg_id == sr1_id) || (v_agex_ld_reg && agex_reg_id == sr1_id))) || (sr2_needed && ((v_sr_ld_reg && sr_reg_id == sr2_id) || (v_mem_ld_reg && mem_reg_id == sr2_id) || (v_agex_ld_reg && agex_reg_id == sr2_id)));
+  }
   
 
   LD_AGEX = !mem_stall;
@@ -1305,8 +1315,6 @@ void DE_stage() {
   if (v_sr_ld_reg) {
 	REGS[sr_reg_id] = sr_reg_data;
 
-
-
 }
 
 
@@ -1315,8 +1323,64 @@ void DE_stage() {
 void FETCH_stage() {
 
   /* your code for FETCH stage goes here */
+  int read_word, next_pc, pcmux_out;
+  int LD_DE;
+  printf("dep_stall = %d\n", dep_stall);
+  printf("icache_r = %d\n", icache_r);
+  printf("v_de_br_stall = %d\n", v_de_br_stall);
+  printf("v_agex_br_stall = %d\n", v_agex_br_stall);
+  printf("mem_stall = %d\n", mem_stall);
+  printf("v_mem_br_stall = %d\n", v_mem_br_stall);
+  printf("PCMUX = %d\n", MEM_PCMUX);
+
+  icache_access(PC, &read_word, &icache_r);
+  next_pc = PC + 2;
+
+  /*PCMUX*/
+  switch (mem_pcmux) {
+	case 0:
+	  pcmux_out = next_pc;
+	  break;
+	case 1:
+	  pcmux_out = target_pc;
+	  break;
+	case 2:
+	  pcmux_out = trap_pc;
+	  break;
+	default:
+	  printf("impossible...unknown mem_pcmux: %d\n", mem_pcmux);
+	  break;
+  }
+
+  /* LD.PC */
+  if (mem_pcmux != 0) {
+
+  } else {
+
+  }
+
+  /* LD.DE */
+  /* ??????????????????????????????????*/
+  if (dep_stall || mem_stall) {
+	LD_DE = 0;
+  } else {
+	LD_DE = 1;
+  }
+
+  if (LD_DE) {
+	NEW_PS.DE_NPC = next_pc;
+	NEW_PS.DE_IR = read_word;
+
+	if (!icache_r || v_de_br_stall || v_agex_br_stall || v_mem_br_stall) {
+	  NEW_PS.DE_V = 0;
+	} else {
+	  NEW_PS.DE_V = 1;
+	}
+	/* if LD_DE == 0, do we still need to set NEW_PS.DE_V = 1??? */
+  }
   
-
-
+  if (ld_pc) {
+	PC = pcmux_out;
+  }
 }  
 
