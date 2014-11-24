@@ -797,6 +797,7 @@ void dcache_access(int dcache_addr, int *read_word, int write_word, int *dcache_
     if(mem_w0) MEMORY[addr][0] = write_word & 0x00FF;
     if(mem_w1) MEMORY[addr][1] = (write_word & 0xFF00) >> 8;
   }
+  /* printf("&&&&&&&&dcache_r:%d\n", dcache_r); */
 }
 /***************************************************************/
 /*                                                             */
@@ -955,9 +956,10 @@ void MEM_stage() {
   int ii,jj = 0;
   /* your code for MEM stage goes here */
   int we0, we1;
-  int v_dache_en;
+  int v_dcache_en;
   int write_word, read_word;
   int dcache_r;
+
 
 
   /* BR LOGIC */
@@ -969,13 +971,18 @@ void MEM_stage() {
 	} else if (Get_UNCOND_OP(PS.MEM_CS)) { /* this bit is set if the instruciton is a JSR/JSRR or a JMP */
 	  mem_pcmux = 1;
 	} else if (Get_BR_OP(PS.MEM_CS)) {
-	  if ((GETBIT(PS.MEM_IR, 11) && GETBIT(PS.MEM_CC, 2)) || (GETBIT(PS.MEM_IR, 10) && GETBIT(PS.MEM_CC, 2)) || (GETBIT(PS.MEM_IR, 9) && GETBIT(PS.MEM_CC, 0))) {
+	  if ((GETBIT(PS.MEM_IR, 11) && GETBIT(PS.MEM_CC, 2)) || (GETBIT(PS.MEM_IR, 10) && GETBIT(PS.MEM_CC, 1)) || (GETBIT(PS.MEM_IR, 9) && GETBIT(PS.MEM_CC, 0))) {
 		mem_pcmux = 1;
 	  }
 	} else {
 	  mem_pcmux = 0;
 	}
   }
+
+
+  printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+  printf("PS.MEM_V = %d\n", PS.MEM_V);
+  printf("PCMUX = %d\n", mem_pcmux);
 
   /*MEM.DRID*/
   mem_drid = PS.MEM_DRID;
@@ -986,7 +993,7 @@ void MEM_stage() {
   v_mem_ld_reg = (PS.MEM_V) && (Get_MEM_LD_REG(PS.MEM_CS));
 
   /* WE LIGIC */
-  //if (!(Get_DCACHE_EN(PS.MEM_CS))) {
+  /* if (!(Get_DCACHE_EN(PS.MEM_CS))) { */
   if (Get_DCACHE_RW(PS.MEM_CS)) {
 	we0 = 0;
 	we1 = 0;
@@ -1016,13 +1023,13 @@ void MEM_stage() {
 
   /* write_word of DCACHE */
   if (Get_DATA_SIZE(PS.MEM_CS)) {
-	write_word = PS.MEMALU_RESULT;
+	write_word = PS.MEM_ALU_RESULT;
   } else {
 	if (!GETBIT(PS.MEM_ADDRESS, 0)) {
-	  write_word = Low16bits(PS.MEMALU_RESULT & 0xFF);
+	  write_word = Low16bits(PS.MEM_ALU_RESULT & 0xFF);
 	} else {
 	  /* Do we need to split into two cases??? */
-	  write_word = Low16bits((PS.MEMALU_RESULT << 8) & 0xFF00);
+	  write_word = Low16bits((PS.MEM_ALU_RESULT << 8) & 0xFF00);
 	}
   }
 
@@ -1043,8 +1050,8 @@ void MEM_stage() {
   } else {
 	/* Actually trap_pc should be map to the case data_size=word */
 	if (!GETBIT(PS.MEM_ADDRESS, 0)) {
-	  trap_pc = Low16bits(sext(read_word & 0xFF, 8))
-		NEW_PS.SR_DATA = trap_pc;
+	  trap_pc = Low16bits(sext(read_word & 0xFF, 8));
+	  NEW_PS.SR_DATA = trap_pc;
 	} else {
 	  /* Do we need to split into two cases??? */
 	  trap_pc = Low16bits(sext((Low16bits(read_word) >> 8) & 0xFF, 8));
@@ -1086,7 +1093,7 @@ int v_agex_ld_cc,
 	agex_drid;
 
 /* x is the bit number */
-#define GETNUM(x) ((CURRENT_LATCHES.IR) & ((1 << (x)) - 1))
+#define GETNUM(x) ((PS.AGEX_IR) & ((1 << (x)) - 1))
 
 /************************* AGEX_stage() *************************/
 void AGEX_stage() {
@@ -1097,12 +1104,12 @@ void AGEX_stage() {
 
   /* your code for AGEX stage goes here */
   int base, offset, addressmux_out;
-  int sr2, alu_out, steer, shfbit, shf_out;
+  int sr2, alu_out, steer, shfbit, shf_out, alu_resultmux_out;
   /* ADDR1MUX */
   if (!Get_ADDR1MUX(PS.AGEX_CS)) {
 	base = PS.AGEX_NPC;
   } else {
-	base = PS.AGEX.SR1;
+	base = PS.AGEX_SR1;
   }
   switch (Get_ADDR2MUX(PS.AGEX_CS)) {
 	case 0:
@@ -1187,9 +1194,9 @@ void AGEX_stage() {
 
   /* ALU.REULTMUX */
   if (!Get_ALU_RESULTMUX(PS.AGEX_CS)) {
-	NEW_PS.MEM_ALU_RESULT = shf_out;
+	alu_resultmux_out = shf_out;
   } else {
-	NEW_PS.MEM_ALU_RESULT = alu_out;
+	alu_resultmux_out = alu_out;
   }
 
   /*Dependency Check Logic*/
@@ -1206,7 +1213,7 @@ void AGEX_stage() {
 	NEW_PS.MEM_ADDRESS = addressmux_out;
 	NEW_PS.MEM_NPC = PS.AGEX_NPC;
 	NEW_PS.MEM_CC = PS.AGEX_CC;
-	NEW_PS.MEM_ALU_RESULT = PS.AGEX_ALU_RESULT;
+	NEW_PS.MEM_ALU_RESULT = alu_resultmux_out;
 	NEW_PS.MEM_IR = PS.AGEX_IR;
 	NEW_PS.MEM_DRID = PS.AGEX_DRID;
 	NEW_PS.MEM_V = PS.AGEX_V;
@@ -1235,7 +1242,7 @@ void DE_stage() {
   /* your code for DE stage goes here */
   int sr1_id, sr2_id, sr2_idmux, drmux_out, sr1_needed, sr2_needed;
   /* SR1 ID */
-  sr1_id = (PS.DR_IR >> 6) & 0x7;
+  sr1_id = (PS.DE_IR >> 6) & 0x7;
 
   /* CONTROL STORE ADDRESS */
   CONTROL_STORE_ADDRESS = ((PS.DE_IR >> 10) & 0x3E) + ((PS.DE_IR >> 5) &0x1);  /*0b111110 */
@@ -1253,7 +1260,7 @@ void DE_stage() {
 
 
   /*DRMUX*/
-  if (!Get_DRMUX(PS.DE_CS)) {
+  if (!Get_DRMUX(CONTROL_STORE[CONTROL_STORE_ADDRESS])) {
 	drmux_out = (PS.DE_IR >> 9) & 0x7;
   } else {
 	drmux_out = 0x7;
@@ -1282,10 +1289,10 @@ void DE_stage() {
 
   if (LD_AGEX) {
     /* Your code for latching into AGEX latches goes here */
-	NEW_PC.AGEX_NPC = PS.DE_NPC;
-	NEW_PC.AGEX_IR = PS.DE_IR;
-	NEW_PC.AGEX_SR1 = REGS[sr1_id];
-	NEW_PC.AGEX_SR2 = REGS[sr2_id];
+	NEW_PS.AGEX_NPC = PS.DE_NPC;
+	NEW_PS.AGEX_IR = PS.DE_IR;
+	NEW_PS.AGEX_SR1 = REGS[sr1_id];
+	NEW_PS.AGEX_SR2 = REGS[sr2_id];
 
 	NEW_PS.AGEX_CC = (N << 2) + (Z << 1) + P;
 	NEW_PS.AGEX_DRID = drmux_out;
@@ -1320,6 +1327,7 @@ void DE_stage() {
   /* LD REG */
   if (v_sr_ld_reg) {
 	REGS[sr_reg_id] = sr_reg_data;
+  }
 
 }
 
@@ -1329,7 +1337,7 @@ void DE_stage() {
 void FETCH_stage() {
 
   /* your code for FETCH stage goes here */
-  int read_word, next_pc, pcmux_out;
+  int read_word, next_pc, pcmux_out, ld_pc;
   int LD_DE;
   printf("dep_stall = %d\n", dep_stall);
   printf("icache_r = %d\n", icache_r);
@@ -1337,7 +1345,7 @@ void FETCH_stage() {
   printf("v_agex_br_stall = %d\n", v_agex_br_stall);
   printf("mem_stall = %d\n", mem_stall);
   printf("v_mem_br_stall = %d\n", v_mem_br_stall);
-  printf("PCMUX = %d\n", MEM_PCMUX);
+  printf("PCMUX = %d\n", mem_pcmux);
 
   icache_access(PC, &read_word, &icache_r);
   next_pc = PC + 2;
@@ -1375,6 +1383,7 @@ void FETCH_stage() {
 
   /* LD.DE */
   /* ??????????????????????????????????*/
+  printf("#####################dep_stall:%d\n; mem_stall:%d\n", dep_stall, mem_stall);
   if (dep_stall || mem_stall) {
 	LD_DE = 0;
   } else {
