@@ -980,9 +980,11 @@ void MEM_stage() {
   }
 
 
+  /*
   printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
   printf("PS.MEM_V = %d\n", PS.MEM_V);
   printf("PCMUX = %d\n", mem_pcmux);
+  */
 
   /*MEM.DRID*/
   mem_drid = PS.MEM_DRID;
@@ -995,17 +997,15 @@ void MEM_stage() {
   /* WE LIGIC */
   /* if (!(Get_DCACHE_EN(PS.MEM_CS))) { */
   if (!Get_DCACHE_RW(PS.MEM_CS)) {
-	printf("set we0 and we1 to 0...\n");
 	we0 = 0;
 	we1 = 0;
   } else {
-	printf("set we0 and we1 to other value.....\n");
 	if (Get_DATA_SIZE(PS.MEM_CS)) {
 	  if (!(GETBIT(PS.MEM_ADDRESS, 0))) {
 		we0 = 1;
 		we1 = 1;
 	  } else {
-		printf("impossible.....\n");
+		/* printf("impossible.....\n"); */
 		we0 = 0;
 		we1 = 0;
 	  }
@@ -1036,36 +1036,35 @@ void MEM_stage() {
   }
 
 
+  /*
   printf("!!!!!!!!we0:%d;we1:%d\n", we0, we1);
   printf("PS.MEM_ADDRESS:%4x\n", PS.MEM_ADDRESS);
+  */
 
   /* DCACHE */
   /* D-Cache is accessed in the MEM stage by those instructions that need to read data from or write data to memory, with DCACHE.EN set in the control store */
   if (v_dcache_en) {
-	printf("dcache_access..\n");
 	dcache_access(PS.MEM_ADDRESS, &read_word, write_word, &dcache_r, we0, we1);
   } else {
 	read_word = 0;
 	/* dcache_r = 0 */
   }
 
+  /*
   printf("DCACHE_R: %d\n", dcache_r);
-
   printf("read_word:%4x\n", read_word);
+  */
 
   /* OUTPUT of DCACHE*/
   if (Get_DATA_SIZE(PS.MEM_CS)) {
-	printf("flag1\n");
 	trap_pc = read_word;
 	NEW_PS.SR_DATA = trap_pc;
   } else {
 	/* Actually trap_pc should be map to the case data_size=word */
 	if (!GETBIT(PS.MEM_ADDRESS, 0)) {
-	  printf("flag2\n");
 	  trap_pc = Low16bits(sext(read_word & 0xFF, 8));
 	  NEW_PS.SR_DATA = trap_pc;
 	} else {
-	  printf("flag3\n");
 	  /* Do we need to split into two cases??? */
 	  trap_pc = Low16bits(sext((Low16bits(read_word) >> 8) & 0xFF, 8));
 	  NEW_PS.SR_DATA = trap_pc;
@@ -1138,7 +1137,7 @@ void AGEX_stage() {
 	  offset = sext(GETNUM(11), 11);
 	  break;
 	default:
-	  printf("impossible!\n");
+	  /* printf("impossible!\n"); */
 	  offset = 0;
 	  break;
   }
@@ -1154,7 +1153,7 @@ void AGEX_stage() {
 	addressmux_out = Low16bits(base + offset);
   }
 
-  printf("addressmux_out:%04x\n", addressmux_out);
+  /* printf("addressmux_out:%04x\n", addressmux_out);*/
 
   /* SR2MUX */
   if (!Get_SR2MUX(PS.AGEX_CS)) {
@@ -1179,13 +1178,13 @@ void AGEX_stage() {
 	  alu_out = Low16bits(PS.AGEX_SR2);
 	  break;
 	default:
-	  printf("alu_impossible...\n");
+	  /* printf("alu_impossible...\n"); */
 	  alu_out = 0;
 	  break;
   }
 
 
-  printf("#########alu_out:%d\n", alu_out);
+  /* printf("#########alu_out:%d\n", alu_out); */
 
   /* SHF */
   shfbit = GETNUM(4);
@@ -1203,12 +1202,12 @@ void AGEX_stage() {
 	  shf_out = Low16bits(sext(PS.AGEX_SR1, 16) >> shfbit);
 	  break;
 	default:
-	  printf("steer_impossible...\n");
+	  /* printf("steer_impossible...\n"); */
 	  shf_out = 0;
 	  shf_out = Low16bits(PS.AGEX_SR1 << shfbit);
 	  break;
   }
-  printf("shf_out:%04x\n", shf_out);
+  /* printf("shf_out:%04x\n", shf_out); */
 
   /* ALU.REULTMUX */
   if (!Get_ALU_RESULTMUX(PS.AGEX_CS)) {
@@ -1270,15 +1269,15 @@ void DE_stage() {
   /*sr2_idmux = (((PS.DE_IR >> 12) & 0xF) == 3) && (((PS.DE_IR >> 12) & 0xF) == 7); */
   /* DE.IR[13] is used to select between DE.IR[11:9] or DE.IR[2:0] */
 
-  printf("%%%%%%%%%%PS.DE_IR: %4x\n", PS.DE_IR);
+  /* printf("%%%%%%%%%%PS.DE_IR: %4x\n", PS.DE_IR); */
   sr2_idmux = (PS.DE_IR >> 13) & 0x1;
-  printf("%%%%%%%%%%sr2_idmux: %d\n", sr2_idmux);
+  /* printf("%%%%%%%%%%sr2_idmux: %d\n", sr2_idmux); */
   if (!sr2_idmux) {
 	sr2_id = (PS.DE_IR >> 0) & 0x7;
   } else {
 	sr2_id = (PS.DE_IR >> 9) & 0x7;
   }
-  printf("%%%%%%%%%%sr2_id: %d\n", sr2_id);
+  /* printf("%%%%%%%%%%sr2_id: %d\n", sr2_id); */
 
 
   /*DRMUX*/
@@ -1310,7 +1309,7 @@ void DE_stage() {
   LD_AGEX = !mem_stall;
 
 
-  printf("########sr2_id:%d\n", sr2_id);
+  /* printf("########sr2_id:%d\n", sr2_id); */
 
   if (LD_AGEX) {
     /* Your code for latching into AGEX latches goes here */
@@ -1369,6 +1368,7 @@ void FETCH_stage() {
   next_pc = PC + 2;
 
 
+  /*
   printf("dep_stall = %d\n", dep_stall);
   printf("icache_r = %d\n", icache_r);
   printf("v_de_br_stall = %d\n", v_de_br_stall);
@@ -1376,6 +1376,7 @@ void FETCH_stage() {
   printf("mem_stall = %d\n", mem_stall);
   printf("v_mem_br_stall = %d\n", v_mem_br_stall);
   printf("PCMUX = %d\n", mem_pcmux);
+  */
 
 
 
@@ -1392,7 +1393,7 @@ void FETCH_stage() {
 	  pcmux_out = trap_pc;
 	  break;
 	default:
-	  printf("impossible...unknown mem_pcmux: %d\n", mem_pcmux);
+	  /* printf("impossible...unknown mem_pcmux: %d\n", mem_pcmux); */
 	  break;
   }
 
@@ -1412,7 +1413,7 @@ void FETCH_stage() {
 
   /* LD.DE */
   /* ??????????????????????????????????*/
-  printf("#####################dep_stall:%d\n; mem_stall:%d\n", dep_stall, mem_stall);
+  /* printf("#####################dep_stall:%d\n; mem_stall:%d\n", dep_stall, mem_stall); */
   if (dep_stall || mem_stall) {
 	LD_DE = 0;
   } else {
